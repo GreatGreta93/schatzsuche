@@ -2,151 +2,232 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Schatzsuche · Technik-Test</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#141c3a">
+<title>Schatzsuche</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-  body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#16213e;color:#f1f1f1;padding:16px}
-  h1{font-size:22px;margin:0 0 4px}
-  p.sub{margin:0 0 16px;color:#aab}
-  section{background:#1f2b4d;border-radius:12px;padding:14px;margin-bottom:12px}
-  h2{font-size:17px;margin:0 0 8px}
-  button{font:inherit;min-height:44px;padding:8px 14px;border:0;border-radius:10px;background:#2ec4b6;color:#0b1a2a;font-weight:600;margin:4px 6px 4px 0}
-  button.alt{background:#ff9f68}
-  .out{white-space:pre-wrap;background:#0f1730;border-radius:8px;padding:10px;margin-top:8px;font-family:ui-monospace,monospace;font-size:14px;min-height:1.5em}
-  .ok{color:#7ee787}.err{color:#ff7b72}
-  input{font:inherit;width:100%;padding:10px;border-radius:8px;border:0;margin-top:6px}
+:root{
+  --bg:#141c3a;--panel:#1f2a55;--panel2:#273469;--ink:#f4f1ff;--mute:#a9b1d6;
+  --tq:#2ec4b6;--pink:#ff6fa5;--orange:#ff9f43;--violet:#8c6cff;
+  --r0:#b8c0cc;--r1:#4fa3ff;--r2:#b072ff;--r3:#ffc23d;
+}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 Fredoka,system-ui,sans-serif;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-tap-highlight-color:transparent;overflow-x:hidden}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.screen{display:none;min-height:100%;padding:18px 16px 32px;max-width:560px;margin:0 auto}
+.screen.on{display:block}
+h1{font-size:30px;line-height:1.05;margin:6px 0 4px;font-weight:700}
+h2{font-size:22px;margin:0 0 10px;font-weight:600}
+.mute{color:var(--mute)}
+.small{font-size:14px}
+
+/* Start */
+.hero{position:relative;border-radius:22px;background:linear-gradient(160deg,#2b3a7a,#1b2450 60%,#3a2357);padding:18px;overflow:hidden;margin:10px 0 14px}
+.hero svg{position:absolute;right:-10px;bottom:-14px;width:150px;opacity:.95}
+.wx{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:999px;padding:6px 12px;font-size:15px;margin-top:8px}
+.hint{margin:10px 0 0;max-width:62%;font-size:15px}
+.today{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+.chip{border-radius:999px;padding:6px 12px;background:var(--panel);font-size:14px}
+.chip.done{background:rgba(46,196,182,.2);color:#7ff0e4}
+.big{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:20px;padding:16px;margin-bottom:12px;background:var(--panel)}
+.big .ic{font-size:34px;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
+.big b{display:block;font-size:19px;font-weight:600}
+.big span{color:var(--mute);font-size:14px}
+.big.kurz .ic{background:rgba(46,196,182,.22)}
+.big.exp .ic{background:rgba(255,159,67,.22)}
+.row{display:flex;gap:10px}
+.row>button{flex:1}
+.ghost{background:var(--panel);border-radius:14px;padding:12px;min-height:48px}
+.primary{background:var(--tq);color:#0b1a2a;font-weight:600;border-radius:14px;padding:12px 16px;min-height:50px}
+.primary:disabled{background:#3b4675;color:#8c95c0}
+.warm{background:var(--orange);color:#2a1300}
+.back{background:none;color:var(--mute);padding:8px 0;min-height:44px}
+
+/* Expedition wählen */
+.durs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0}
+.dur{background:var(--panel);border-radius:18px;padding:14px;text-align:left;min-height:96px}
+.dur b{font-size:24px;display:block}
+.dur span{font-size:13px;color:var(--mute);display:block}
+.dur .odds{margin-top:6px;display:flex;gap:4px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+/* Karte */
+#karte.on{display:flex;flex-direction:column;padding:0;max-width:none;height:100dvh}
+#map{flex:1;min-height:200px;background:#cfd8dc}
+.sheet{background:var(--bg);border-radius:20px 20px 0 0;margin-top:-18px;position:relative;z-index:500;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.ort{font-size:15px;color:var(--mute)}
+.dist{font-size:34px;font-weight:700;line-height:1.1;margin:4px 0}
+.dist.nah{color:var(--r3)}
+.sheet .row{margin-top:10px}
+.youdot{width:18px;height:18px;border-radius:50%;background:#2f80ff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(47,128,255,.25)}
+.chest-ic{filter:drop-shadow(0 3px 3px rgba(0,0,0,.35))}
+
+/* Kurz raus */
+.meter{height:14px;border-radius:999px;background:var(--panel);overflow:hidden;margin:14px 0 8px}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--tq),#7ff0e4);transition:width .4s}
+
+/* Funde */
+.find{display:flex;gap:12px;align-items:center;background:var(--panel);border-radius:16px;padding:12px;margin-bottom:10px}
+.find .ic{font-size:30px;width:48px;height:48px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--panel2)}
+.find .t{flex:1}
+.find b{display:block}
+.rar{display:inline-block;font-size:12px;border-radius:999px;padding:1px 8px;font-weight:600;color:#0b1020}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:14px;letter-spacing:.5px}
+.copy{background:var(--panel2);border-radius:12px;padding:8px 10px;min-height:44px;font-size:14px;flex:none}
+.stats{display:flex;gap:10px;margin:8px 0 14px}
+.stat{flex:1;background:var(--panel);border-radius:16px;padding:12px}
+.stat b{font-size:24px;display:block}
+
+/* Einstellungen */
+.box{background:var(--panel);border-radius:18px;padding:14px;margin-bottom:12px}
+.box p{margin:4px 0 10px}
+textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;font:14px ui-monospace,monospace;background:#0f1530;color:var(--ink)}
+
+/* Fund-Enthüllung */
+#reveal{position:fixed;inset:0;z-index:2000;background:rgba(8,10,28,.88);display:none;align-items:center;justify-content:center;padding:20px}
+#reveal.on{display:flex}
+.chestbtn{background:none;width:190px;height:170px;animation:wackel 1.4s ease-in-out infinite}
+.chestbtn svg{width:100%;height:100%}
+@keyframes wackel{0%,100%{transform:rotate(0)}10%{transform:rotate(-6deg)}20%{transform:rotate(6deg)}30%{transform:rotate(-3deg)}40%{transform:rotate(0)}}
+.tap{text-align:center;color:var(--mute);margin-top:6px}
+.card{width:min(360px,100%);background:var(--panel);border-radius:24px;padding:22px 18px;text-align:center;position:relative;animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.card .big-ic{font-size:72px;line-height:1;margin:6px 0 10px;display:inline-block;animation:schweb 2.4s ease-in-out infinite}
+@keyframes schweb{50%{transform:translateY(-6px)}}
+.card h2{margin:6px 0 4px}
+.card .code{display:block;font-size:20px;margin:12px 0 8px;background:#0f1530;border-radius:12px;padding:10px}
+.glow{position:absolute;inset:-3px;border-radius:26px;z-index:-1;filter:blur(14px);opacity:.85}
+.konf{position:fixed;width:9px;height:14px;border-radius:2px;z-index:2001;pointer-events:none;animation:fall 1.6s ease-out forwards}
+@keyframes fall{to{transform:translate(var(--dx),var(--dy)) rotate(var(--rot));opacity:0}}
+
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0b1020;color:#fff;padding:10px 16px;border-radius:12px;z-index:3000;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
-<h1>Schatzsuche · Technik-Test</h1>
-<p class="sub">Stand 20.11.2026. Bitte am Handy öffnen und die drei Tests nacheinander ausprobieren.</p>
 
-<section>
-  <h2>1 · Standort</h2>
-  <button id="bPos">Standort abfragen</button>
-  <div class="out" id="oPos"></div>
+<!-- Einrichtung -->
+<section class="screen" id="setup">
+  <h1>Willkommen bei der Schatzsuche!</h1>
+  <p>Damit „Kurz raus“ fair zählt, braucht die App einmal deinen Startpunkt. Stell dich dafür in deine Wohnung und tippe auf den Knopf.</p>
+  <p class="mute small">Die Position bleibt nur auf diesem Handy gespeichert und landet nie im Internet oder im Code.</p>
+  <button class="primary" id="setHome" style="width:100%">🏠 Hier wohne ich</button>
+  <p class="small mute" id="setupMsg"></p>
 </section>
 
-<section>
-  <h2>2 · Wetter am aktuellen Standort</h2>
-  <button id="bWx">Wetter abrufen</button>
-  <div class="out" id="oWx"></div>
+<!-- Start -->
+<section class="screen" id="start">
+  <div class="hero">
+    <h1>Schatzsuche</h1>
+    <div class="wx" id="wx">🧭 Wetter wird geprüft …</div>
+    <p class="hint" id="wxHint"></p>
+    <svg viewBox="0 0 120 100" aria-hidden="true"><use href="#chest"/></svg>
+  </div>
+  <div class="today" id="today"></div>
+  <button class="big kurz" id="goKurz"><div class="ic">🚪</div><div><b>Kurz raus</b><span>Einmal am Tag ein Fund vor der Haustür · ab 50 m</span></div></button>
+  <button class="big exp" id="goExp"><div class="ic">🗺️</div><div><b>Expedition</b><span>Ziel auf der Karte · je länger, desto seltener</span></div></button>
+  <div class="row">
+    <button class="ghost" id="goFunde">📜 Meine Funde</button>
+    <button class="ghost" id="goSet">⚙️ Einstellungen</button>
+  </div>
 </section>
 
-<section>
-  <h2>3 · Laufen zum Testziel</h2>
-  <p>Setzt ein Ziel ca. 150 m nördlich von dir. Danach live die Entfernung beobachten (gern ein Stück gehen).</p>
-  <button id="bTgt">Testziel setzen &amp; verfolgen</button>
-  <button id="bArr" class="alt">Ziel hierher setzen (Ankommen testen)</button>
-  <div class="out" id="oTgt"></div>
+<!-- Expedition wählen -->
+<section class="screen" id="wahl">
+  <button class="back" data-go="start">← Zurück</button>
+  <h1>Wie lange?</h1>
+  <p class="mute" id="wahlInfo">Hin und zurück, ungefähr.</p>
+  <div class="durs" id="durs"></div>
+  <p class="small mute" id="wahlMsg"></p>
 </section>
 
-<section>
-  <h2>4 · Fund-Code</h2>
-  <button id="bCode">Test-Fund erzeugen</button>
-  <div class="out" id="oCode"></div>
-  <button id="bCopy" class="alt">Code kopieren</button>
-  <input id="iCode" placeholder="Code hier einfügen zum Prüfen">
-  <div class="out" id="oChk"></div>
+<!-- Karte -->
+<section class="screen" id="karte">
+  <div id="map"></div>
+  <div class="sheet">
+    <div class="ort" id="ort">…</div>
+    <div class="dist" id="dist">Suche Standort …</div>
+    <div class="small mute" id="acc"></div>
+    <button class="primary" id="collect" style="width:100%;margin-top:10px" disabled>🎁 Einsammeln</button>
+    <div class="row">
+      <button class="ghost" id="center">📍 Zentrieren</button>
+      <button class="ghost" id="reroll">🎲 Anderes Ziel</button>
+      <button class="ghost" id="abort">✕ Abbrechen</button>
+    </div>
+  </div>
 </section>
 
-<script>
-{
-  const $ = id => document.getElementById(id);
-  const say = (el, txt, cls) => { el.textContent = txt; el.className = 'out ' + (cls || ''); };
-  let last = null, watch = null, target = null;
+<!-- Kurz raus -->
+<section class="screen" id="kurz">
+  <button class="back" id="kurzBack">← Zurück</button>
+  <h1>Kurz raus</h1>
+  <p id="kurzText">Geh mindestens 50 m von zu Hause weg. Sobald du weit genug draußen bist, kannst du deinen Fund einsammeln.</p>
+  <div class="meter"><i id="kurzBar"></i></div>
+  <div class="dist" id="kurzDist">…</div>
+  <div class="small mute" id="kurzAcc"></div>
+  <button class="primary" id="kurzCollect" style="width:100%;margin-top:14px" disabled>🎁 Einsammeln</button>
+</section>
 
-  const getPos = () => new Promise((res, rej) => {
-    if (!navigator.geolocation) return rej(new Error('Kein Standortzugriff in diesem Browser.'));
-    navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000 });
-  });
+<!-- Meine Funde -->
+<section class="screen" id="funde">
+  <button class="back" data-go="start">← Zurück</button>
+  <h1>Meine Funde</h1>
+  <div class="stats" id="stats"></div>
+  <div id="list"></div>
+</section>
 
-  $('bPos').onclick = async () => {
-    say($('oPos'), 'Frage Standort ab …');
-    try {
-      const p = await getPos();
-      last = p.coords;
-      say($('oPos'), `✓ Breite ${last.latitude.toFixed(5)}, Länge ${last.longitude.toFixed(5)}\nGenauigkeit ± ${Math.round(last.accuracy)} m`, 'ok');
-    } catch (e) { say($('oPos'), '✗ ' + (e.message || e), 'err'); }
-  };
+<!-- Einstellungen -->
+<section class="screen" id="set">
+  <button class="back" data-go="start">← Zurück</button>
+  <h1>Einstellungen</h1>
+  <div class="box">
+    <b>Zuhause</b>
+    <p class="small mute">Neu festlegen, wenn du umziehst oder die Position ungenau war. Nur in der Wohnung drücken.</p>
+    <button class="ghost" id="resetHome" style="width:100%">🏠 Zuhause hier neu festlegen</button>
+  </div>
+  <div class="box">
+    <b>Fundliste sichern</b>
+    <p class="small mute">Die Funde liegen nur in diesem Browser. Sichere sie ab und zu, zum Beispiel in eine Notiz.</p>
+    <button class="ghost" id="backup" style="width:100%">📋 Sicherung kopieren</button>
+  </div>
+  <div class="box">
+    <b>Fundliste wiederherstellen</b>
+    <p class="small mute">Sicherung hier einfügen. Vorhandene Funde bleiben erhalten, doppelte Codes werden übersprungen.</p>
+    <textarea id="restoreTxt" placeholder="Sicherung einfügen …"></textarea>
+    <button class="ghost" id="restore" style="width:100%;margin-top:8px">↩️ Wiederherstellen</button>
+  </div>
+  <p class="small mute">Karte © OpenStreetMap-Mitwirkende · Wetter: Open-Meteo</p>
+</section>
 
-  const WMO = c => c === 0 ? 'klar' : c <= 3 ? 'bewölkt' : c <= 48 ? 'Nebel' : c <= 57 ? 'Nieselregen'
-    : c <= 67 ? 'Regen' : c <= 77 ? 'Schnee' : c <= 82 ? 'Regenschauer' : c <= 86 ? 'Schneeschauer' : 'Gewitter';
+<!-- Fund-Enthüllung -->
+<div id="reveal" role="dialog" aria-modal="true"></div>
+<div id="toast"></div>
 
-  $('bWx').onclick = async () => {
-    say($('oWx'), 'Rufe Wetter ab …');
-    try {
-      if (!last) last = (await getPos()).coords;
-      const u = `https://api.open-meteo.com/v1/forecast?latitude=${last.latitude}&longitude=${last.longitude}`
-        + '&current=temperature_2m,precipitation,rain,snowfall,weather_code,is_day&timezone=auto';
-      const r = await fetch(u);
-      if (!r.ok) throw new Error('Antwort ' + r.status);
-      const c = (await r.json()).current;
-      say($('oWx'), `✓ ${WMO(c.weather_code)} (Code ${c.weather_code}), ${c.temperature_2m} °C\nNiederschlag ${c.precipitation} mm · Regen ${c.rain} mm · Schnee ${c.snowfall} cm\n${c.is_day ? 'Tag' : 'Nacht'} · Stand ${c.time}`, 'ok');
-    } catch (e) { say($('oWx'), '✗ ' + (e.message || e), 'err'); }
-  };
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="chest">
+      <ellipse cx="60" cy="92" rx="44" ry="6" fill="rgba(0,0,0,.25)"/>
+      <rect x="18" y="46" width="84" height="44" rx="8" fill="#a0602e"/>
+      <rect x="18" y="46" width="84" height="10" fill="#8a4f22"/>
+      <path d="M16 48 Q16 18 60 18 Q104 18 104 48 Z" fill="#c07a3c"/>
+      <path d="M26 46 Q26 26 60 26" fill="none" stroke="#e3a466" stroke-width="4" stroke-linecap="round"/>
+      <rect x="52" y="18" width="16" height="72" fill="#ffc23d"/>
+      <rect x="14" y="44" width="92" height="6" rx="3" fill="#ffc23d"/>
+      <rect x="51" y="50" width="18" height="18" rx="4" fill="#ffd977" stroke="#b8860b" stroke-width="2"/>
+      <circle cx="60" cy="58" r="3" fill="#6b4300"/>
+    </g>
+  </defs>
+</svg>
 
-  const dist = (a, b) => {
-    const R = 6371000, r = x => x * Math.PI / 180;
-    const dLat = r(b.lat - a.lat), dLon = r(b.lon - a.lon);
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(h));
-  };
-
-  const track = () => {
-    if (watch !== null) navigator.geolocation.clearWatch(watch);
-    watch = navigator.geolocation.watchPosition(p => {
-      last = p.coords;
-      const d = dist({ lat: last.latitude, lon: last.longitude }, target);
-      const hit = d <= 30;
-      say($('oTgt'), `${hit ? '🎁 Angekommen! Fund wäre jetzt einsammelbar.' : 'Unterwegs …'}\nEntfernung: ${Math.round(d)} m (± ${Math.round(last.accuracy)} m)\nAktualisiert: ${new Date().toLocaleTimeString('de-DE')}`, hit ? 'ok' : '');
-    }, e => say($('oTgt'), '✗ ' + e.message, 'err'), { enableHighAccuracy: true, maximumAge: 2000 });
-  };
-
-  $('bTgt').onclick = async () => {
-    try {
-      if (!last) last = (await getPos()).coords;
-      target = { lat: last.latitude + 150 / 111320, lon: last.longitude };
-      track();
-    } catch (e) { say($('oTgt'), '✗ ' + (e.message || e), 'err'); }
-  };
-  $('bArr').onclick = async () => {
-    try {
-      if (!last) last = (await getPos()).coords;
-      target = { lat: last.latitude, lon: last.longitude };
-      track();
-    } catch (e) { say($('oTgt'), '✗ ' + (e.message || e), 'err'); }
-  };
-
-  // Fund-Code: GP-XXXX-XXXX-C (Inhalt + Prüfzeichen gegen Tippfehler)
-  const AL = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const check = s => AL[[...s].reduce((a, ch, i) => a + AL.indexOf(ch) * (i + 1), 0) % AL.length];
-  const ITEMS = ['Regen-Ei', 'Kastanie', 'Ginkgo-Samen', 'Frost-Feder', 'Nebel-Kiesel'];
-
-  $('bCode').onclick = () => {
-    const item = Math.floor(Math.random() * ITEMS.length);
-    const day = Math.floor(Date.now() / 864e5) % 1024;
-    let body = AL[item] + AL[day >> 5] + AL[day & 31];
-    for (let i = 0; i < 5; i++) body += AL[Math.floor(Math.random() * 32)];
-    const code = `GP-${body.slice(0, 4)}-${body.slice(4)}-${check(body)}`;
-    say($('oCode'), `Fund: ${ITEMS[item]}\nCode: ${code}`, 'ok');
-    $('oCode').dataset.code = code;
-  };
-  $('bCopy').onclick = async () => {
-    const c = $('oCode').dataset.code;
-    if (!c) return;
-    try { await navigator.clipboard.writeText(c); $('bCopy').textContent = 'Kopiert ✓'; }
-    catch (e) { $('bCopy').textContent = 'Kopieren nicht möglich'; }
-    setTimeout(() => $('bCopy').textContent = 'Code kopieren', 1800);
-  };
-  $('iCode').oninput = () => {
-    const raw = $('iCode').value.toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/^GP/, '');
-    if (raw.length < 9) return say($('oChk'), '');
-    const body = raw.slice(0, 8), c = raw[8];
-    if ([...body].some(ch => !AL.includes(ch)) || check(body) !== c) return say($('oChk'), '✗ Code ungültig (Tippfehler?)', 'err');
-    say($('oChk'), `✓ Gültig: ${ITEMS[AL.indexOf(body[0])] || 'unbekannter Fund'}`, 'ok');
-  };
-}
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="katalog.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
