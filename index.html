@@ -232,7 +232,14 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
 </svg>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="katalog.js"></script>
-<script src="app.js"></script>
+<script>
+  // Falls etwas schiefgeht (z. B. alte Datei im Zwischenspeicher), Hinweis statt leerer Seite
+  window.addEventListener('error', () => {
+    if (document.querySelector('.screen.on')) return;
+    document.body.insertAdjacentHTML('beforeend', '<section class="screen on"><h1>Kurz neu laden</h1><p>Die App wurde gerade aktualisiert und dein Handy hat noch Teile der alten Version gespeichert.</p><button class="primary" onclick="location.reload()">↻ Neu laden</button></section>');
+  });
+</script>
+<script src="katalog.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
