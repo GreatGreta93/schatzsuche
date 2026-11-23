@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Schatzsuche · Technik-Test</title>
+<style>
+  body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#16213e;color:#f1f1f1;padding:16px}
+  h1{font-size:22px;margin:0 0 4px}
+  p.sub{margin:0 0 16px;color:#aab}
+  section{background:#1f2b4d;border-radius:12px;padding:14px;margin-bottom:12px}
+  h2{font-size:17px;margin:0 0 8px}
+  button{font:inherit;min-height:44px;padding:8px 14px;border:0;border-radius:10px;background:#2ec4b6;color:#0b1a2a;font-weight:600;margin:4px 6px 4px 0}
+  button.alt{background:#ff9f68}
+  .out{white-space:pre-wrap;background:#0f1730;border-radius:8px;padding:10px;margin-top:8px;font-family:ui-monospace,monospace;font-size:14px;min-height:1.5em}
+  .ok{color:#7ee787}.err{color:#ff7b72}
+  input{font:inherit;width:100%;padding:10px;border-radius:8px;border:0;margin-top:6px}
+</style>
+</head>
+<body>
+<h1>Schatzsuche · Technik-Test</h1>
+<p class="sub">Stand 20.11.2026. Bitte am Handy öffnen und die drei Tests nacheinander ausprobieren.</p>
+
+<section>
+  <h2>1 · Standort</h2>
+  <button id="bPos">Standort abfragen</button>
+  <div class="out" id="oPos"></div>
+</section>
+
+<section>
+  <h2>2 · Wetter am aktuellen Standort</h2>
+  <button id="bWx">Wetter abrufen</button>
+  <div class="out" id="oWx"></div>
+</section>
+
+<section>
+  <h2>3 · Laufen zum Testziel</h2>
+  <p>Setzt ein Ziel ca. 150 m nördlich von dir. Danach live die Entfernung beobachten (gern ein Stück gehen).</p>
+  <button id="bTgt">Testziel setzen &amp; verfolgen</button>
+  <button id="bArr" class="alt">Ziel hierher setzen (Ankommen testen)</button>
+  <div class="out" id="oTgt"></div>
+</section>
+
+<section>
+  <h2>4 · Fund-Code</h2>
+  <button id="bCode">Test-Fund erzeugen</button>
+  <div class="out" id="oCode"></div>
+  <button id="bCopy" class="alt">Code kopieren</button>
+  <input id="iCode" placeholder="Code hier einfügen zum Prüfen">
+  <div class="out" id="oChk"></div>
+</section>
+
+<script>
+{
+  const $ = id => document.getElementById(id);
+  const say = (el, txt, cls) => { el.textContent = txt; el.className = 'out ' + (cls || ''); };
+  let last = null, watch = null, target = null;
+
+  const getPos = () => new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error('Kein Standortzugriff in diesem Browser.'));
+    navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000 });
+  });
+
+  $('bPos').onclick = async () => {
+    say($('oPos'), 'Frage Standort ab …');
+    try {
+      const p = await getPos();
+      last = p.coords;
+      say($('oPos'), `✓ Breite ${last.latitude.toFixed(5)}, Länge ${last.longitude.toFixed(5)}\nGenauigkeit ± ${Math.round(last.accuracy)} m`, 'ok');
+    } catch (e) { say($('oPos'), '✗ ' + (e.message || e), 'err'); }
+  };
+
+  const WMO = c => c === 0 ? 'klar' : c <= 3 ? 'bewölkt' : c <= 48 ? 'Nebel' : c <= 57 ? 'Nieselregen'
+    : c <= 67 ? 'Regen' : c <= 77 ? 'Schnee' : c <= 82 ? 'Regenschauer' : c <= 86 ? 'Schneeschauer' : 'Gewitter';
+
+  $('bWx').onclick = async () => {
+    say($('oWx'), 'Rufe Wetter ab …');
+    try {
+      if (!last) last = (await getPos()).coords;
+      const u = `https://api.open-meteo.com/v1/forecast?latitude=${last.latitude}&longitude=${last.longitude}`
+        + '&current=temperature_2m,precipitation,rain,snowfall,weather_code,is_day&timezone=auto';
+      const r = await fetch(u);
+      if (!r.ok) throw new Error('Antwort ' + r.status);
+      const c = (await r.json()).current;
+      say($('oWx'), `✓ ${WMO(c.weather_code)} (Code ${c.weather_code}), ${c.temperature_2m} °C\nNiederschlag ${c.precipitation} mm · Regen ${c.rain} mm · Schnee ${c.snowfall} cm\n${c.is_day ? 'Tag' : 'Nacht'} · Stand ${c.time}`, 'ok');
+    } catch (e) { say($('oWx'), '✗ ' + (e.message || e), 'err'); }
+  };
+
+  const dist = (a, b) => {
+    const R = 6371000, r = x => x * Math.PI / 180;
+    const dLat = r(b.lat - a.lat), dLon = r(b.lon - a.lon);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
+  const track = () => {
+    if (watch !== null) navigator.geolocation.clearWatch(watch);
+    watch = navigator.geolocation.watchPosition(p => {
+      last = p.coords;
+      const d = dist({ lat: last.latitude, lon: last.longitude }, target);
+      const hit = d <= 30;
+      say($('oTgt'), `${hit ? '🎁 Angekommen! Fund wäre jetzt einsammelbar.' : 'Unterwegs …'}\nEntfernung: ${Math.round(d)} m (± ${Math.round(last.accuracy)} m)\nAktualisiert: ${new Date().toLocaleTimeString('de-DE')}`, hit ? 'ok' : '');
+    }, e => say($('oTgt'), '✗ ' + e.message, 'err'), { enableHighAccuracy: true, maximumAge: 2000 });
+  };
+
+  $('bTgt').onclick = async () => {
+    try {
+      if (!last) last = (await getPos()).coords;
+      target = { lat: last.latitude + 150 / 111320, lon: last.longitude };
+      track();
+    } catch (e) { say($('oTgt'), '✗ ' + (e.message || e), 'err'); }
+  };
+  $('bArr').onclick = async () => {
+    try {
+      if (!last) last = (await getPos()).coords;
+      target = { lat: last.latitude, lon: last.longitude };
+      track();
+    } catch (e) { say($('oTgt'), '✗ ' + (e.message || e), 'err'); }
+  };
+
+  // Fund-Code: GP-XXXX-XXXX-C (Inhalt + Prüfzeichen gegen Tippfehler)
+  const AL = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const check = s => AL[[...s].reduce((a, ch, i) => a + AL.indexOf(ch) * (i + 1), 0) % AL.length];
+  const ITEMS = ['Regen-Ei', 'Kastanie', 'Ginkgo-Samen', 'Frost-Feder', 'Nebel-Kiesel'];
+
+  $('bCode').onclick = () => {
+    const item = Math.floor(Math.random() * ITEMS.length);
+    const day = Math.floor(Date.now() / 864e5) % 1024;
+    let body = AL[item] + AL[day >> 5] + AL[day & 31];
+    for (let i = 0; i < 5; i++) body += AL[Math.floor(Math.random() * 32)];
+    const code = `GP-${body.slice(0, 4)}-${body.slice(4)}-${check(body)}`;
+    say($('oCode'), `Fund: ${ITEMS[item]}\nCode: ${code}`, 'ok');
+    $('oCode').dataset.code = code;
+  };
+  $('bCopy').onclick = async () => {
+    const c = $('oCode').dataset.code;
+    if (!c) return;
+    try { await navigator.clipboard.writeText(c); $('bCopy').textContent = 'Kopiert ✓'; }
+    catch (e) { $('bCopy').textContent = 'Kopieren nicht möglich'; }
+    setTimeout(() => $('bCopy').textContent = 'Code kopieren', 1800);
+  };
+  $('iCode').oninput = () => {
+    const raw = $('iCode').value.toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/^GP/, '');
+    if (raw.length < 9) return say($('oChk'), '');
+    const body = raw.slice(0, 8), c = raw[8];
+    if ([...body].some(ch => !AL.includes(ch)) || check(body) !== c) return say($('oChk'), '✗ Code ungültig (Tippfehler?)', 'err');
+    say($('oChk'), `✓ Gültig: ${ITEMS[AL.indexOf(body[0])] || 'unbekannter Fund'}`, 'ok');
+  };
+}
+</script>
+</body>
+</html>
