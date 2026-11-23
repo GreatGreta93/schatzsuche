@@ -16,8 +16,10 @@
   const KURZ_M = 50, MAX_ACC_KURZ = 30, NAH_M = 30, MAX_ACC_ZIEL = 50;
 
   // ---------- Speicher ----------
-  let S = { home: null, finds: [], recent: [], active: null };
+  let S = { homes: [], finds: [], recent: [], active: null };
   try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
+  // Umzug aus Version 1: ein einzelnes Zuhause wird zum Startpunkt „Wohnung“
+  if (S.home) { S.homes = [{ name: 'Wohnung', lat: S.home.lat, lon: S.home.lon }, ...S.homes]; delete S.home; }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
   const pad = n => String(n).padStart(2, '0');
@@ -45,12 +47,12 @@
     return { lat: p.lat + (m * Math.cos(b)) / 111320, lon: p.lon + (m * Math.sin(b)) / (111320 * Math.cos(p.lat * Math.PI / 180)) };
   };
   const fmtM = m => m >= 1000 ? (Math.round(m / 100) / 10).toLocaleString('de-DE') + ' km' : Math.round(m / 10) * 10 + ' m';
-  const getPos = () => new Promise((res, rej) => {
+  const getPos = (frisch = false) => new Promise((res, rej) => {
     if (!navigator.geolocation) return rej(new Error('Dieser Browser kann keinen Standort liefern.'));
     navigator.geolocation.getCurrentPosition(
       p => res({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }),
       e => rej(new Error(e.code === 1 ? 'Standort nicht erlaubt. Bitte in den Browser-Einstellungen freigeben.' : 'Standort gerade nicht verfügbar.')),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 });
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: frisch ? 0 : 5000 });
   });
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -64,6 +66,7 @@
     if (id === 'start') renderStart();
     if (id === 'funde') renderFunde();
     if (id === 'wahl') renderWahl();
+    if (id === 'set') renderSet();
   };
   document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => show(b.dataset.go));
 
@@ -190,19 +193,44 @@
   $('goFunde').onclick = () => show('funde');
   $('goSet').onclick = () => show('set');
 
-  // ---------- Einrichtung ----------
-  const setHome = async (btn, msgEl, done) => {
-    btn.disabled = true; msgEl.textContent = 'Frage Standort ab …';
-    try {
-      const p = await getPos();
-      S.home = { lat: p.lat, lon: p.lon }; save();
-      msgEl.textContent = `Gespeichert (Genauigkeit ± ${Math.round(p.acc)} m).`;
-      done && done();
-    } catch (e) { msgEl.textContent = e.message; }
-    btn.disabled = false;
+  // ---------- Startpunkte ----------
+  // Startpunkte (Wohnung, Schmaggo …) bleiben nur auf diesem Handy. „Kurz raus“ misst vom nächstgelegenen.
+  const naechster = p => S.homes.reduce((b, h) => { const d = dist(p, h); return !b || d < b.d ? { h, d } : b; }, null);
+  const posHier = async () => {
+    const p = await getPos(true);
+    if (p.acc > 60) toast(`Achtung: GPS ungenau (± ${Math.round(p.acc)} m). Ggf. gleich nochmal festlegen.`);
+    return p;
   };
-  $('setHome').onclick = () => setHome($('setHome'), $('setupMsg'), () => setTimeout(() => show('start'), 700));
-  $('resetHome').onclick = () => setHome($('resetHome'), { set textContent(t) { toast(t); } });
+  $('setHome').onclick = async () => {
+    $('setHome').disabled = true; $('setupMsg').textContent = 'Frage Standort ab …';
+    try {
+      const p = await posHier();
+      S.homes = [{ name: 'Wohnung', lat: p.lat, lon: p.lon }]; save();
+      $('setupMsg').textContent = `Gespeichert (Genauigkeit ± ${Math.round(p.acc)} m).`;
+      setTimeout(() => show('start'), 700);
+    } catch (e) { $('setupMsg').textContent = e.message; }
+    $('setHome').disabled = false;
+  };
+  const renderSet = () => {
+    $('homes').innerHTML = S.homes.map((h, i) => `<div class="hrow"><span>🏠 ${esc(h.name)}</span>
+      <button class="copy" data-neu="${i}">📍 hier neu</button>
+      ${S.homes.length > 1 ? `<button class="copy" data-del="${i}">🗑️</button>` : ''}</div>`).join('');
+    $('homes').querySelectorAll('[data-neu]').forEach(b => b.onclick = async () => {
+      try { const p = await posHier(), h = S.homes[+b.dataset.neu]; h.lat = p.lat; h.lon = p.lon; save(); toast(`„${h.name}“ neu festgelegt`); }
+      catch (e) { toast(e.message); }
+    });
+    $('homes').querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.del;
+      if (b.dataset.armed) { S.homes.splice(i, 1); save(); renderSet(); return; }
+      b.dataset.armed = 1; b.textContent = 'Sicher?';
+    });
+  };
+  $('addHome').onclick = async () => {
+    const name = $('homeName').value.trim();
+    if (!name) return toast('Bitte zuerst einen Namen eingeben, z. B. „Schmaggo“.');
+    try { const p = await posHier(); S.homes.push({ name, lat: p.lat, lon: p.lon }); save(); $('homeName').value = ''; renderSet(); toast(`„${name}“ gespeichert`); }
+    catch (e) { toast(e.message); }
+  };
 
   // ---------- Kurz raus ----------
   const startKurz = () => {
@@ -213,15 +241,15 @@
       $('kurzCollect').disabled = true;
       return;
     }
-    $('kurzText').textContent = `Geh mindestens ${KURZ_M} m von zu Hause weg. Sobald du weit genug draußen bist, kannst du deinen Fund einsammeln.`;
+    $('kurzText').textContent = `Geh mindestens ${KURZ_M} m von deinem Startpunkt weg. Sobald du weit genug draußen bist, kannst du deinen Fund einsammeln.`;
     $('kurzDist').textContent = 'Suche Standort …';
     let last = null;
     const upd = p => {
       last = p;
-      const d = dist(p, S.home), ok = d >= KURZ_M && p.acc <= MAX_ACC_KURZ;
+      const n = naechster(p), d = n.d, ok = d >= KURZ_M && p.acc <= MAX_ACC_KURZ;
       $('kurzBar').style.width = Math.min(100, d / KURZ_M * 100) + '%';
       $('kurzDist').textContent = d >= KURZ_M ? 'Du bist draußen! 🌿' : `noch ${Math.max(1, Math.ceil(KURZ_M - d))} m`;
-      $('kurzAcc').textContent = p.acc > MAX_ACC_KURZ ? `GPS noch ungenau (± ${Math.round(p.acc)} m) – kurz warten …` : `Genauigkeit ± ${Math.round(p.acc)} m`;
+      $('kurzAcc').textContent = (p.acc > MAX_ACC_KURZ ? `GPS noch ungenau (± ${Math.round(p.acc)} m) – kurz warten …` : `Genauigkeit ± ${Math.round(p.acc)} m`) + ` · gemessen ab „${n.h.name}“`;
       $('kurzCollect').disabled = !ok;
     };
     watchId = navigator.geolocation.watchPosition(
@@ -418,7 +446,7 @@
   };
 
   // ---------- Los geht's ----------
-  if (!S.home) show('setup');
+  if (!S.homes.length) show('setup');
   else if (S.active) openKarte();
   else show('start');
 }

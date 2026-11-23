@@ -87,6 +87,9 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 /* Einstellungen */
 .box{background:var(--panel);border-radius:18px;padding:14px;margin-bottom:12px}
 .box p{margin:4px 0 10px}
+.box .ghost{background:var(--panel2)}
+input{width:100%;min-height:48px;border-radius:12px;border:0;padding:10px 12px;font:16px Fredoka,system-ui,sans-serif;background:#0f1530;color:var(--ink);margin-top:6px}
+.hrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}.hrow span{flex:1}
 textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;font:14px ui-monospace,monospace;background:#0f1530;color:var(--ink)}
 
 /* Fund-Enthüllung */
@@ -131,7 +134,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     <svg viewBox="0 0 120 100" aria-hidden="true"><use href="#chest"/></svg>
   </div>
   <div class="today" id="today"></div>
-  <button class="big kurz" id="goKurz"><div class="ic">🚪</div><div><b>Kurz raus</b><span>Einmal am Tag ein Fund vor der Haustür · ab 50 m</span></div></button>
+  <button class="big kurz" id="goKurz"><div class="ic">🚪</div><div><b>Kurz raus</b><span>Einmal am Tag ein Fund vor der Haustür · ab 50 m vom Startpunkt</span></div></button>
   <button class="big exp" id="goExp"><div class="ic">🗺️</div><div><b>Expedition</b><span>Ziel auf der Karte · je länger, desto seltener</span></div></button>
   <div class="row">
     <button class="ghost" id="goFunde">📜 Meine Funde</button>
@@ -188,9 +191,11 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
   <button class="back" data-go="start">← Zurück</button>
   <h1>Einstellungen</h1>
   <div class="box">
-    <b>Zuhause</b>
-    <p class="small mute">Neu festlegen, wenn du umziehst oder die Position ungenau war. Nur in der Wohnung drücken.</p>
-    <button class="ghost" id="resetHome" style="width:100%">🏠 Zuhause hier neu festlegen</button>
+    <b>Startpunkte</b>
+    <p class="small mute">„Kurz raus“ misst automatisch vom nächstgelegenen Startpunkt. Festlegen immer drinnen, in der jeweiligen Wohnung. Die Punkte bleiben nur auf diesem Handy.</p>
+    <div id="homes"></div>
+    <input id="homeName" placeholder="Name, z. B. Schmaggo" maxlength="24">
+    <button class="ghost" id="addHome" style="width:100%;margin-top:8px">➕ Neuen Startpunkt hier anlegen</button>
   </div>
   <div class="box">
     <b>Fundliste sichern</b>
