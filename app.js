@@ -174,8 +174,9 @@
   // ---------- Start ----------
   const renderStart = () => {
     const k = foundToday('kurz'), e = foundToday('exp');
-    $('today').innerHTML = `<span class="chip ${k ? 'done' : ''}">${k ? '✓' : '○'} Kurz raus</span>
-      <span class="chip ${e ? 'done' : ''}">${e ? '✓' : '○'} Expedition</span>`;
+    // Haken direkt im Button: Tagesfund dieser Art schon eingesammelt
+    $('goKurz').classList.toggle('done', k);
+    $('goExp').classList.toggle('done', e);
     if (S.active) {
       $('goExp').querySelector('b').textContent = 'Expedition fortsetzen';
       $('goExp').querySelector('span').textContent = 'Dein Ziel wartet noch auf dich';

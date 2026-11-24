@@ -32,15 +32,13 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .hero svg{position:absolute;right:-10px;bottom:-14px;width:150px;opacity:.95}
 .wx{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:999px;padding:6px 12px;font-size:15px;margin-top:8px}
 .hint{margin:10px 0 0;max-width:62%;font-size:15px}
-.today{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
-.chip{border-radius:999px;padding:6px 12px;background:var(--panel);font-size:14px}
-.chip.done{background:rgba(46,196,182,.2);color:#7ff0e4}
-.big{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:20px;padding:16px;margin-bottom:12px;background:var(--panel)}
+.big{position:relative;display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:20px;padding:16px;margin-bottom:12px;background:var(--panel)}
 .big .ic{font-size:34px;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .big b{display:block;font-size:19px;font-weight:600}
 .big span{color:var(--mute);font-size:14px}
 .big.kurz .ic{background:rgba(46,196,182,.22)}
 .big.exp .ic{background:rgba(255,159,67,.22)}
+.big.done::after{content:'✓ heute';position:absolute;top:10px;right:12px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;background:rgba(46,196,182,.2);color:#7ff0e4}
 .row{display:flex;gap:10px}
 .row>button{flex:1}
 .ghost{background:var(--panel);border-radius:14px;padding:12px;min-height:48px}
@@ -148,7 +146,6 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     <p class="hint" id="wxHint"></p>
     <svg viewBox="0 0 120 100" aria-hidden="true"><use href="#chest"/></svg>
   </div>
-  <div class="today" id="today"></div>
   <button class="big kurz" id="goKurz"><div class="ic">🚪</div><div><b>Kurz raus</b><span>Einmal am Tag ein Fund vor der Haustür · ab 50 m vom Startpunkt</span></div></button>
   <button class="big exp" id="goExp"><div class="ic">🗺️</div><div><b>Expedition</b><span>Ziel auf der Karte · je länger, desto seltener</span></div></button>
   <div class="row">
