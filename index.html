@@ -60,7 +60,9 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .durs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0}
 .dur{--c:var(--tq);background:linear-gradient(150deg,color-mix(in srgb,var(--c) 22%,transparent),var(--panel) 70%);border:2px solid color-mix(in srgb,var(--c) 60%,transparent);border-radius:18px;padding:14px;text-align:left;min-height:96px}
 .dur b{color:var(--c)}
-.dur:nth-child(1){--c:var(--gruen)}.dur:nth-child(2){--c:var(--tq)}.dur:nth-child(3){--c:var(--gelb)}.dur:nth-child(4){--c:var(--rot)}.dur:nth-child(5){--c:var(--gold)}
+.dur:nth-child(1){--c:var(--gruen)}.dur:nth-child(2){--c:var(--tq)}.dur:nth-child(3){--c:var(--gelb)}.dur:nth-child(4){--c:var(--rot)}.dur:nth-child(5){--c:var(--gold);border-color:transparent;
+  background:linear-gradient(150deg,rgba(255,207,92,.2),var(--panel) 70%) padding-box,linear-gradient(var(--panel),var(--panel)) padding-box,
+  linear-gradient(120deg,var(--rot),var(--gelb),var(--gruen),var(--tq)) border-box}
 .dur b{font-size:24px;display:block}
 .dur span{font-size:13px;color:var(--mute);display:block}
 .dur .odds{margin-top:6px;display:flex;gap:4px}
