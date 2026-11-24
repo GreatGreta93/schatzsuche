@@ -61,6 +61,7 @@
   const stopWatch = () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null; };
   const show = id => {
     stopWatch();
+    if (id !== 'karte' && id !== 'kurz') wachAus(); // Bildschirm-an gilt nur während einer Suche
     document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
     window.scrollTo(0, 0);
     if (id === 'start') renderStart();
@@ -428,6 +429,64 @@
       toast(`${neu.length} Funde wiederhergestellt`);
     } catch (e) { toast('Das sieht nicht nach einer Sicherung aus.'); }
   };
+
+  // ---------- Ton, Vibration, Bildschirm an ----------
+  let AC = null;
+  const ton = (folge = [[660, 0, .12], [880, .13, .2]]) => {
+    // Kleiner Glockenton ohne Audiodatei: [Frequenz Hz, Start s, Dauer s]
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t0 = AC.currentTime + .02;
+    folge.forEach(([f, s, d]) => {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0 + s);
+      g.gain.linearRampToValueAtTime(.35, t0 + s + .01);
+      g.gain.exponentialRampToValueAtTime(.001, t0 + s + d);
+      o.connect(g).connect(AC.destination);
+      o.start(t0 + s); o.stop(t0 + s + d + .05);
+    });
+    return AC.state;
+  };
+  $('fxTest').onclick = async () => {
+    const z = [];
+    if (!navigator.vibrate) z.push('📳 Vibration: ✗ gibt es in diesem Browser nicht');
+    else z.push(`📳 Vibration: ${navigator.vibrate([200, 100, 200]) ? '✓ angefragt – hat es gesurrt?' : '✗ vom Browser blockiert'}`);
+    try { await new Promise(r => setTimeout(r, 50)); z.push(`🔔 Ton: ✓ gespielt (Audio: ${ton()}) – hast du ihn gehört?`); }
+    catch (e) { z.push('🔔 Ton: ✗ ' + e.message); }
+    z.push(`☀️ Bildschirm anlassen: ${'wakeLock' in navigator ? '✓ möglich' : '✗ gibt es in diesem Browser nicht'}`);
+    z.push('', 'Gesurrt wird trotz ✓ nur, wenn Vibration in den Handy-Einstellungen an ist und „Nicht stören“ aus.');
+    $('testOut').textContent = z.join('\n');
+  };
+
+  // Bildschirm anlassen: nur auf Knopfdruck, standardmäßig aus, endet beim Verlassen der Suche
+  let wach = null, wachWill = false;
+  const zeigeWach = () => document.querySelectorAll('[data-wach]').forEach(b => {
+    b.textContent = `☀️ Bildschirm anlassen: ${wachWill ? 'an' : 'aus'}`;
+    b.classList.toggle('an', wachWill);
+  });
+  const wachHolen = async () => {
+    try {
+      wach = await navigator.wakeLock.request('screen');
+      wach.addEventListener('release', () => { wach = null; });
+    } catch (e) { wachWill = false; zeigeWach(); toast('Bildschirm anlassen klappt gerade nicht.'); }
+  };
+  function wachAus() {
+    wachWill = false;
+    if (wach) { wach.release().catch(() => {}); wach = null; }
+    zeigeWach();
+  }
+  document.querySelectorAll('[data-wach]').forEach(b => b.onclick = async () => {
+    if (wachWill) { wachAus(); return toast('Bildschirm geht wieder normal aus'); }
+    if (!('wakeLock' in navigator)) return toast('Das kann dieser Browser leider nicht. Probier es in Chrome.');
+    wachWill = true; zeigeWach();
+    await wachHolen();
+    if (wachWill) toast('Bildschirm bleibt an – kostet etwas Akku');
+  });
+  // Android gibt die Sperre beim Wegwechseln frei; beim Zurückkommen neu holen
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && wachWill && !wach) wachHolen();
+  });
 
   // ---------- Los geht's ----------
   if (!S.homes.length) show('setup');
