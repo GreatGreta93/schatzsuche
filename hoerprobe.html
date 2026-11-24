@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Schatzsuche · Hörprobe</title>
+<style>
+  body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#16213e;color:#f1f1f1;padding:16px 16px 120px}
+  h1{font-size:22px;margin:0 0 4px}
+  p.sub{margin:0 0 16px;color:#aab}
+  section{background:#1f2b4d;border-radius:12px;padding:14px;margin-bottom:12px}
+  h2{font-size:17px;margin:0 0 2px}
+  .hint{color:#aab;font-size:14px;margin:0 0 8px}
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0}
+  .lbl{width:78px;color:#aab;font-size:14px}
+  button{font:inherit;min-height:44px;padding:6px 12px;border:0;border-radius:10px;background:#2b3a66;color:#f1f1f1;font-weight:600}
+  button.sel{background:#2ec4b6;color:#0b1a2a}
+  button.play{background:#ff9f68;color:#0b1a2a}
+  button small{display:block;font-weight:400;font-size:12px;opacity:.8;line-height:1.2}
+  .r0{color:#c9d1d9}.r1{color:#58a6ff}.r2{color:#d2a8ff}.r3{color:#ffd166}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#0f1730;padding:10px 16px;display:flex;gap:8px;align-items:center;box-shadow:0 -4px 16px #0008}
+  .bar button{flex:1}
+  .out{white-space:pre-wrap;background:#0f1730;border-radius:8px;padding:10px;margin-top:8px;font-family:ui-monospace,monospace;font-size:13px}
+</style>
+</head>
+<body>
+<h1>Schatzsuche · Hörprobe</h1>
+<p class="sub">Stand 24.11.2026 · Klangrichtung „weich &amp; natürlich“ (Kalimba, Holz, Tropfen, Windspiel). In Chrome öffnen, Lautstärke normal, Vibration an.<br>
+Tippe eine Variante an: Sie spielt und wird ausgewählt. „▶ Beides“ spielt deine gewählte Kombi aus Ton und Vibration. Am Ende „Auswahl kopieren“ und mir schicken.</p>
+
+<div id="liste"></div>
+
+<section>
+  <h2>Deine Auswahl</h2>
+  <div class="out" id="out"></div>
+</section>
+
+<div class="bar">
+  <button id="alle" class="play">▶ Truhen 1–4 nacheinander</button>
+  <button id="kopie">📋 Auswahl kopieren</button>
+</div>
+
+<script>
+// ================= Klang-Baukasten (Web Audio, keine Dateien) =================
+let AC, OUT, HALL, RAUSCH;
+const init = () => {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  AC = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = AC.createDynamicsCompressor();
+  comp.connect(AC.destination);
+  OUT = AC.createGain(); OUT.gain.value = .55; OUT.connect(comp);
+  // kleiner natürlicher Raumhall (selbst erzeugte Impulsantwort)
+  const len = AC.sampleRate * 1.8, ir = AC.createBuffer(2, len, AC.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+  const conv = AC.createConvolver(); conv.buffer = ir;
+  HALL = AC.createGain(); HALL.gain.value = .22; HALL.connect(conv).connect(comp);
+  // Rauschen für Holz und Wind
+  RAUSCH = AC.createBuffer(1, AC.sampleRate * 3, AC.sampleRate);
+  const r = RAUSCH.getChannelData(0); for (let i = 0; i < r.length; i++) r[i] = Math.random() * 2 - 1;
+};
+const ziel = g => { g.connect(OUT); g.connect(HALL); return g; };
+const N = n => { // Notenname -> Hz, z. B. 'C5', 'A#4'
+  const m = /^([A-G])(#?)(\d)$/.exec(n), s = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] ? 1 : 0);
+  return 440 * Math.pow(2, (s + (+m[3] + 1) * 12 - 69) / 12);
+};
+const T = () => AC.currentTime + .03;
+const sinus = (t, f, vol, dec, att = .005, typ = 'sine') => {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = typ; o.frequency.value = f;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + att);
+  g.gain.exponentialRampToValueAtTime(.0001, t + att + dec);
+  o.connect(g); ziel(g); o.start(t); o.stop(t + att + dec + .05);
+  return o;
+};
+const rausch = (t, dur, f, q, vol) => {
+  const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = RAUSCH; b.type = 'bandpass'; b.frequency.value = f; b.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(b).connect(g); ziel(g); s.start(t, Math.random()); s.stop(t + dur + .02);
+};
+// Instrumente
+const I = {
+  kalimba: (t, n, v = 1, dec = 1.1) => { const f = N(n); sinus(t, f, .32 * v, dec); sinus(t, f * 5.9, .05 * v, .12); rausch(t, .015, f * 3, 2, .05 * v); },
+  marimba: (t, n, v = 1, dec = .55) => { const f = N(n); sinus(t, f, .34 * v, dec); sinus(t, f * 4, .08 * v, dec * .25); sinus(t, f * 9.9, .03 * v, .04); },
+  glocke:  (t, n, v = 1, dec = 2.4) => { const f = N(n); [[1, 1], [2.76, .35], [5.4, .15], [8.93, .06]].forEach(([k, a], i) => sinus(t, f * k, .2 * v * a, dec / (1 + i * .9), .003)); },
+  tropfen: (t, f = 900, v = 1) => {
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 2.4, t + .07);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.3 * v, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + .13);
+    o.connect(g); ziel(g); o.start(t); o.stop(t + .2);
+  },
+  holz: (t, f = 1600, v = 1) => { sinus(t, f, .25 * v, .05, .002, 'triangle'); rausch(t, .03, f * 1.6, 6, .25 * v); },
+  wind: (t, dur = 2.5, v = 1) => {
+    const s = AC.createBufferSource(), b = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = RAUSCH; b.type = 'bandpass'; b.Q.value = 1.2;
+    b.frequency.setValueAtTime(350, t); b.frequency.linearRampToValueAtTime(1300, t + dur * .6); b.frequency.linearRampToValueAtTime(700, t + dur);
+    g.gain.setValueAtTime(.0001, t); g.gain.linearRampToValueAtTime(.09 * v, t + dur * .5); g.gain.linearRampToValueAtTime(.0001, t + dur);
+    s.connect(b).connect(g); ziel(g); s.start(t); s.stop(t + dur + .05);
+  },
+};
+const folge = (inst, noten, v = 1, dec) => { const t = T(); noten.forEach(([s, n, vv = 1, d]) => I[inst](t + s, n, v * vv, d || dec)); };
+const wuerfel = (v = 1) => { const t = T(); [0, .13, .23, .3, .35, .39].forEach((s, i) => I.holz(t + s, 1300 + Math.random() * 900, v * (1 - i * .13))); return t + .45; };
+
+// Truhen-Melodien, gleich aufgebaut für jede Klangfamilie
+const TRUHE = [
+  [[0, 'C5'], [.12, 'G5', 1, 1.3]],
+  [[0, 'C5'], [.11, 'E5'], [.22, 'G5'], [.38, 'C6', 1, 1.6]],
+  [[0, 'G4'], [.1, 'C5'], [.2, 'E5'], [.3, 'G5'], [.4, 'C6'], [.62, 'E6', 1, 2.2], [.9, 'G6', .35], [1.1, 'C7', .25], [1.3, 'E6', .2]],
+  [[0, 'C5'], [.18, 'D5'], [.36, 'E5'], [.54, 'G5'], [.72, 'A5'], [.9, 'C6'],
+   [1.2, 'E6', .7], [1.27, 'D6', .65], [1.34, 'C6', .6], [1.41, 'A5', .55], [1.48, 'G5', .5],
+   [1.8, 'C4', .8, 3], [1.8, 'C5', .7, 3], [1.82, 'E5', .6, 3], [1.84, 'G5', .6, 3], [1.86, 'D6', .5, 3]],
+];
+const truhe = (inst, r) => {
+  folge(inst, TRUHE[r]);
+  if (r >= 2) folge('glocke', r === 2 ? [[.62, 'E6', .4]] : [[1.8, 'C6', .5, 3.5], [1.86, 'G6', .3, 3]]);
+  if (r === 3) I.wind(T(), 3.2, 1);
+};
+
+// ================= Momente und Varianten =================
+const FAM = { A: ['kalimba', 'Kalimba'], B: ['glocke', 'Windspiel'], C: ['marimba', 'Holz-Marimba'] };
+const M = [
+  { id: 'start', name: 'Ziel gefunden', hint: 'Expedition startet, Schatz liegt auf der Karte.',
+    ton: { A: ['Kalimba ↑', () => folge('kalimba', [[0, 'C5'], [.1, 'E5'], [.2, 'G5']])],
+           B: ['Zwei Tropfen', () => { const t = T(); I.tropfen(t, 700); I.tropfen(t + .16, 1000); }],
+           C: ['Marimba', () => folge('marimba', [[0, 'G4'], [.12, 'C5']])] },
+    vib: { 1: ['kurz', [30]], 2: ['tipp-tipp', [20, 60, 40]] } },
+  { id: 'wuerfel', name: 'Neu gewürfelt', hint: 'Anderes Ziel.',
+    ton: { A: ['Holzwürfel', () => wuerfel()],
+           B: ['Würfel + Ton', () => { wuerfel(.8); folge('kalimba', [[.5, 'G5', .7]]); }] },
+    vib: { 1: ['rattern', [15, 40, 15, 40, 15]], 2: ['zweimal', [25, 50, 25]] } },
+  { id: 'nah', name: 'Fast da (100 m)', hint: 'Eine Stufe. Soll aufhorchen lassen, nicht erschrecken.',
+    ton: { A: ['Zwei Tropfen', () => { const t = T(); I.tropfen(t, 800, .7); I.tropfen(t + .22, 800, .7); }],
+           B: ['Kalimba 2×', () => folge('kalimba', [[0, 'E5', .6], [.25, 'E5', .6]])],
+           C: ['Windspiel', () => folge('glocke', [[0, 'A5', .6], [.15, 'E6', .35]])] },
+    vib: { 1: ['zweimal', [40, 80, 40]], 2: ['einmal lang', [120]], 3: ['dreimal', [30, 60, 30, 60, 30]] } },
+  { id: 'da', name: 'Ziel erreicht', hint: 'Unter 30 m, Truhe kann angetippt werden. Soll man auch draußen bemerken.',
+    ton: { A: ['Kalimba-Lauf', () => { folge('kalimba', [[0, 'C5'], [.1, 'E5'], [.2, 'G5'], [.3, 'C6', 1, 1.6]]); folge('glocke', [[.3, 'C6', .4]]); }],
+           B: ['Marimba fröhlich', () => folge('marimba', [[0, 'G4'], [.12, 'C5'], [.24, 'E5'], [.36, 'G5'], [.52, 'G5', .8], [.64, 'C6', 1, .8]])],
+           C: ['Windspiel-Wolke', () => folge('glocke', ['C6', 'E6', 'G5', 'A5', 'D6', 'G6', 'C6'].map((n, i) => [i * .13 + Math.random() * .05, n, .5 + Math.random() * .3]))] },
+    vib: { 1: ['tam-tam-taaam', [100, 60, 100, 60, 250]], 2: ['trommeln', [60, 40, 60, 40, 60, 40, 300]], 3: ['einmal lang', [400]] } },
+  ...['gewöhnlich', 'selten', 'episch', 'legendär'].map((rn, r) => ({
+    id: 'r' + r, name: 'Truhe: ' + rn, cls: 'r' + r,
+    hint: ['Kurz und freundlich.', 'Etwas mehr.', 'Spürbar besonders, mit Glitzern.', 'Der große Moment: Melodie, Wind, Glockenakkord.'][r],
+    ton: Object.fromEntries(Object.entries(FAM).map(([k, [inst, lbl]]) => [k, [lbl, () => truhe(inst, r)]])),
+    vib: [
+      { 1: ['kurz', [40]], 2: ['tipp-tipp', [30, 50, 60]] },
+      { 1: ['bisher', [60, 40, 120]], 2: ['tipp-tipp-tapp', [50, 50, 50, 50, 150]] },
+      { 1: ['tam-tam-taaam', [80, 50, 80, 50, 250]], 2: ['trommeln', [100, 60, 100, 60, 100, 60, 300]] },
+      { 1: ['Herzschlag', [80, 100, 160, 400, 80, 100, 160, 400, 700]], 2: ['anschwellen', [30, 60, 50, 60, 80, 60, 120, 60, 700]], 3: ['Fanfare', [100, 60, 100, 60, 100, 120, 600]] },
+    ][r] })),
+  { id: 'kurz', name: 'Kurz raus geschafft', hint: '50 m vom Startpunkt weg.',
+    ton: { A: ['Kalimba', () => folge('kalimba', [[0, 'G5'], [.13, 'C6', 1, 1.4]])],
+           B: ['Tropfen + Glocke', () => { I.tropfen(T(), 900); folge('glocke', [[.15, 'E6', .6]]); }],
+           C: ['Marimba', () => folge('marimba', [[0, 'C5'], [.09, 'E5'], [.18, 'G5', 1, .8]])] },
+    vib: { 1: ['tipp-tapp', [70, 60, 140]], 2: ['einmal', [120]] } },
+  { id: 'kopie', name: 'Code kopiert', hint: 'Nur eine kleine Bestätigung.',
+    ton: { A: ['Holzklick', () => I.holz(T(), 1800, .6)], B: ['Tropfen', () => I.tropfen(T(), 1100, .5)], X: ['kein Ton', () => {}] },
+    vib: { 1: ['ganz kurz', [15]], 0: ['keine', []] } },
+  { id: 'nein', name: 'Abbruch / heute schon erledigt', hint: 'Neutral, kein Fehler-Ton.',
+    ton: { X: ['kein Ton', () => {}], A: ['tiefer Holz-Tock', () => I.holz(T(), 500, .7)], B: ['Kalimba ↓', () => folge('kalimba', [[0, 'E5', .5], [.15, 'C5', .5]])] },
+    vib: { 0: ['keine', []], 1: ['kurz', [30]] } },
+];
+
+// ================= Oberfläche =================
+let WAHL = {};
+try { WAHL = JSON.parse(localStorage.getItem('hoerprobe') || '{}'); } catch (e) {}
+const merk = () => { try { localStorage.setItem('hoerprobe', JSON.stringify(WAHL)); } catch (e) {} zeig(); };
+const vib = p => { if (navigator.vibrate) navigator.vibrate(p.length ? p : 0); };
+const beides = m => { init(); const w = WAHL[m.id] || {}; (m.ton[w.ton] || Object.values(m.ton)[0])[1](); vib((m.vib[w.vib] || Object.values(m.vib)[0])[1]); };
+
+const L = document.getElementById('liste');
+M.forEach(m => {
+  WAHL[m.id] = WAHL[m.id] || {};
+  const s = document.createElement('section');
+  s.innerHTML = `<h2 class="${m.cls || ''}">${m.name}</h2><p class="hint">${m.hint}</p>
+    <div class="row"><span class="lbl">🔔 Ton</span>${Object.entries(m.ton).map(([k, [l]]) => `<button data-t="${k}">${k === 'X' ? '–' : k}<small>${l}</small></button>`).join('')}</div>
+    <div class="row"><span class="lbl">📳 Vibration</span>${Object.entries(m.vib).map(([k, [l]]) => `<button data-v="${k}">${k === '0' ? '–' : k}<small>${l}</small></button>`).join('')}</div>
+    <div class="row"><span class="lbl"></span><button class="play" data-p>▶ Beides</button></div>`;
+  const mark = () => {
+    s.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('sel', b.dataset.t === WAHL[m.id].ton));
+    s.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('sel', b.dataset.v === WAHL[m.id].vib));
+  };
+  s.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { init(); m.ton[b.dataset.t][1](); WAHL[m.id].ton = b.dataset.t; mark(); merk(); });
+  s.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { vib(m.vib[b.dataset.v][1]); WAHL[m.id].vib = b.dataset.v; mark(); merk(); });
+  s.querySelector('[data-p]').onclick = () => beides(m);
+  mark(); L.appendChild(s);
+});
+
+const text = () => 'Hörprobe-Auswahl:\n' + M.map(m => {
+  const w = WAHL[m.id], t = m.ton[w.ton], v = m.vib[w.vib];
+  return `- ${m.name}: Ton ${t ? w.ton + ' (' + t[0] + ')' : 'offen'}, Vibration ${v ? w.vib + ' (' + v[0] + ')' : 'offen'}`;
+}).join('\n');
+const zeig = () => document.getElementById('out').textContent = text();
+zeig();
+
+document.getElementById('alle').onclick = () => {
+  init(); [0, 1, 2, 3].forEach((r, i) => setTimeout(() => beides(M.find(m => m.id === 'r' + r)), [0, 1800, 4000, 7000][i]));
+};
+document.getElementById('kopie').onclick = async () => {
+  try { await navigator.clipboard.writeText(text()); document.getElementById('kopie').textContent = '✓ Kopiert'; }
+  catch (e) { document.getElementById('kopie').textContent = 'Bitte Text unten markieren'; }
+  setTimeout(() => document.getElementById('kopie').textContent = '📋 Auswahl kopieren', 2000);
+};
+</script>
+</body>
+</html>
