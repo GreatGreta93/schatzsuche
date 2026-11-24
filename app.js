@@ -26,6 +26,13 @@
   try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
   // Umzug aus Version 1: ein einzelnes Zuhause wird zum Startpunkt „Wohnung“
   if (S.home) { S.homes = [{ name: 'Wohnung', lat: S.home.lat, lon: S.home.lon }, ...S.homes]; delete S.home; }
+  // Ältere Spielstände: abgebrochene Expeditionen aus dem Protokoll entfernen
+  if (S.log.some(e => e.ende === 'abbruch')) {
+    const offen = S.rueck !== null ? S.log[S.rueck] : null;
+    S.log = S.log.filter(e => e.ende !== 'abbruch');
+    S.rueck = offen ? S.log.indexOf(offen) : null;
+    if (S.rueck === -1) S.rueck = null;
+  }
   if (S.ton === undefined) S.ton = true; // Ton standardmäßig an
   KLANG.ton = S.ton;
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
@@ -416,14 +423,15 @@
   $('frageNein').onclick = () => $('frage').classList.remove('on');
   $('frageJa').onclick = () => {
     $('frage').classList.remove('on');
-    if (S.active) protokoll(S.active, 'abbruch');
     KLANG.spiel('nein');
     S.active = null; save(); show('start');
   };
 
   // ---------- Expeditions-Protokoll ----------
-  // Ein Eintrag pro Expedition: Start, Ziel erreicht, zurück. Daraus Hinweg- und Gesamtdauer.
+  // Ein Eintrag pro abgeschlossener Expedition (Ziel erreicht): Start, Ziel, zurück. Daraus Hinweg- und Gesamtdauer.
+  // Abgebrochene Expeditionen werden nicht protokolliert.
   const protokoll = (A, ende) => {
+    if (ende === 'abbruch') return;
     const e = {
       start: A.start, min: A.min, luft: A.luft ?? null,
       wuerfel: MAX_WUERFEL - wuerfelRest(A), heran: !!A.heran,
@@ -530,7 +538,7 @@
       S.finds = [...S.finds, ...neu].sort((a, b) => a.t - b.t);
       if (Array.isArray(o.log)) {
         const da = new Set(S.log.map(e => e.start));
-        S.log = [...S.log, ...o.log.filter(e => e && e.start && !da.has(e.start))].sort((a, b) => a.start - b.start);
+        S.log = [...S.log, ...o.log.filter(e => e && e.start && e.ende !== 'abbruch' && !da.has(e.start))].sort((a, b) => a.start - b.start);
         S.rueck = null;
       }
       save(); $('restoreTxt').value = '';
