@@ -79,6 +79,8 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .ghost:disabled{opacity:.35;filter:grayscale(1);cursor:not-allowed}
 #rerollHinweis{margin-top:8px}
 .wach{width:100%;margin-top:10px;min-height:44px;font-size:15px}
+.fxrow .wach[data-wach]{flex:1}.fxrow .wach[data-ton]{width:auto;flex:0 0 auto;padding:0 14px;white-space:nowrap}
+.wach[data-ton].aus{opacity:.65}
 .wach.an{background:rgba(255,207,92,.16);border-color:var(--gold);color:var(--gold)}
 #testOut{white-space:pre-wrap;background:#0f1530;border-radius:12px;padding:10px;margin-top:8px;font:14px ui-monospace,monospace}
 #testOut:empty{display:none}
@@ -220,7 +222,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
       <button class="ghost" id="abort">✕ Abbrechen</button>
     </div>
     <div class="small mute" id="rerollHinweis" hidden>Alle 3 Würfe für diese Expedition sind verbraucht.</div>
-    <button class="ghost wach" data-wach>☀️ Bildschirm anlassen: aus</button>
+    <div class="row fxrow"><button class="ghost wach" data-wach>☀️ Bildschirm anlassen: aus</button><button class="ghost wach" data-ton>🔔 Ton an</button></div>
   </div>
 </section>
 
@@ -233,7 +235,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
   <div class="dist" id="kurzDist">…</div>
   <div class="small mute" id="kurzAcc"></div>
   <button class="primary" id="kurzCollect" style="width:100%;margin-top:14px" disabled>🎁 Einsammeln</button>
-  <button class="ghost wach" data-wach>☀️ Bildschirm anlassen: aus</button>
+  <div class="row fxrow"><button class="ghost wach" data-wach>☀️ Bildschirm anlassen: aus</button><button class="ghost wach" data-ton>🔔 Ton an</button></div>
 </section>
 
 <!-- Meine Funde -->
@@ -277,8 +279,10 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     <button class="ghost" id="restore" style="width:100%;margin-top:8px">↩️ Wiederherstellen</button>
   </div>
   <div class="box">
-    <b>Ton &amp; Vibration testen</b>
-    <p class="small mute">Spielt einen Testton, lässt das Handy kurz vibrieren und zeigt, was dieser Browser kann.</p>
+    <b>Ton &amp; Vibration</b>
+    <p class="small mute">Der Schalter macht nur den Ton stumm, die Vibration bleibt. Er ist auch auf der Karte und bei „Kurz raus“.</p>
+    <button class="ghost wach" data-ton style="margin:0 0 10px">🔔 Ton an</button>
+    <p class="small mute">Der Test spielt einen Testton, lässt das Handy kurz vibrieren und zeigt, was dieser Browser kann.</p>
     <button class="ghost" id="fxTest" style="width:100%">🔔 Test starten</button>
     <div id="testOut"></div>
   </div>
@@ -322,7 +326,8 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     document.body.insertAdjacentHTML('beforeend', '<section class="screen on"><h1>Kurz neu laden</h1><p>Die App wurde gerade aktualisiert und dein Handy hat noch Teile der alten Version gespeichert.</p><button class="primary" onclick="location.reload()">↻ Neu laden</button></section>');
   });
 </script>
-<script src="katalog.js?v=8"></script>
-<script src="app.js?v=8"></script>
+<script src="katalog.js?v=9"></script>
+<script src="klang.js?v=9"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// Schatzsuche – App-Logik (Version 1, Stand 23.11.2026)
+// Schatzsuche – App-Logik (Version 1, Stand 24.11.2026)
 {
   const $ = id => document.getElementById(id);
   const KEY = 'schatzsuche';
@@ -17,6 +17,7 @@
   // Schatz heranholen: einmal pro Expedition, erst wenn man höchstens HERAN_MAX m entfernt ist.
   // Danach liegt er HERAN_REST m vor einem (sicher im Einsammel-Radius).
   const HERAN_MAX = 150, HERAN_REST = 15;
+  const FAST_DA_M = 100; // „Fast da“-Signal, einmal pro Ziel
   const RUECK_MAX_H = 4; // so lange wartet „Bin zurück“, danach gilt der Rückweg als nicht erfasst
 
   // ---------- Speicher ----------
@@ -25,6 +26,8 @@
   try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
   // Umzug aus Version 1: ein einzelnes Zuhause wird zum Startpunkt „Wohnung“
   if (S.home) { S.homes = [{ name: 'Wohnung', lat: S.home.lat, lon: S.home.lon }, ...S.homes]; delete S.home; }
+  if (S.ton === undefined) S.ton = true; // Ton standardmäßig an
+  KLANG.ton = S.ton;
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
   const pad = n => String(n).padStart(2, '0');
@@ -38,7 +41,7 @@
     clearTimeout(toastT); toastT = setTimeout(() => $('toast').classList.remove('on'), 2600);
   };
   const copy = async txt => {
-    try { await navigator.clipboard.writeText(txt); toast('Kopiert ✓'); }
+    try { await navigator.clipboard.writeText(txt); KLANG.spiel('kopie'); toast('Kopiert ✓'); }
     catch (e) { toast('Kopieren nicht möglich – bitte markieren und kopieren'); }
   };
   const dist = (a, b) => {
@@ -154,7 +157,7 @@
     $('chestBtn').onclick = () => {
       const it = KATALOG.find(k => k.id === f.id), P = POOLS[f.pool];
       konfetti(RHEX[it.r]);
-      if (navigator.vibrate) navigator.vibrate(it.r >= 2 ? [60, 40, 120] : 40);
+      KLANG.spiel('r' + it.r);
       R.innerHTML = `<div class="card">
         <div class="glow" style="background:${RCOL[it.r]}"></div>
         <span class="rar" style="background:${RCOL[it.r]}">${SELTENHEIT[it.r]}</span>
@@ -249,14 +252,16 @@
       $('kurzText').textContent = 'Den Kurz-raus-Fund für heute hast du schon. Morgen wartet der nächste! Eine Expedition geht natürlich trotzdem.';
       $('kurzDist').textContent = '✓ Erledigt'; $('kurzAcc').textContent = ''; $('kurzBar').style.width = '100%';
       $('kurzCollect').disabled = true;
+      KLANG.spiel('nein');
       return;
     }
     $('kurzText').textContent = `Geh mindestens ${KURZ_M} m von deinem Startpunkt weg. Sobald du weit genug draußen bist, kannst du deinen Fund einsammeln.`;
     $('kurzDist').textContent = 'Suche Standort …';
-    let last = null;
+    let last = null, geschafft = false;
     const upd = p => {
       last = p;
       const n = naechster(p), d = n.d, ok = d >= KURZ_M && p.acc <= MAX_ACC_KURZ;
+      if (ok && !geschafft) { geschafft = true; KLANG.spiel('kurz'); }
       $('kurzBar').style.width = Math.min(100, d / KURZ_M * 100) + '%';
       $('kurzDist').textContent = d >= KURZ_M ? 'Du bist draußen! 🌿' : `noch ${Math.max(1, Math.ceil(KURZ_M - d))} m`;
       $('kurzAcc').textContent = (p.acc > MAX_ACC_KURZ ? `GPS noch ungenau (± ${Math.round(p.acc)} m) – kurz warten …` : `Genauigkeit ± ${Math.round(p.acc)} m`) + ` · gemessen ab „${n.h.name}“`;
@@ -309,6 +314,7 @@
       S.active = { min, start: Date.now(), wuerfel: MAX_WUERFEL, ziel: z, luft: Math.round(dist(p, z)) };
       save();
       openKarte();
+      KLANG.spiel('start');
     } catch (e) {
       $('wahlMsg').textContent = e.message;
       $('wahlLade').hidden = true;
@@ -365,6 +371,10 @@
     $('acc').textContent = `Luftlinie · GPS ± ${Math.round(p.acc)} m`;
     $('collect').disabled = !nah;
     zeigeHeran(d);
+    // Signale einmal pro Ziel (gemerkt am Ziel, damit Neuladen nichts wiederholt)
+    const A = S.active, fx = A.fx && A.fx.key === z.key ? A.fx : (A.fx = { key: z.key });
+    if (nah && !fx.da) { fx.da = fx.nah = true; save(); KLANG.spiel('da'); }
+    else if (!nah && d > NAH_M && d <= FAST_DA_M && !fx.nah) { fx.nah = true; save(); KLANG.spiel('nah'); }
   };
   // Heranholen: nur in der Nähe, nur einmal pro Expedition
   const zeigeHeran = d => {
@@ -391,6 +401,7 @@
   $('center').onclick = () => { if (ich) map.setView([ich.lat, ich.lon], 17); };
   $('reroll').onclick = async () => {
     if (!S.active || wuerfelRest(S.active) <= 0) return;
+    KLANG.spiel('wuerfel');
     $('reroll').disabled = true; $('collect').disabled = true; $('kartLade').hidden = false;
     $('dist').textContent = 'Suche neues Ziel …'; $('dist').classList.remove('nah');
     try {
@@ -406,6 +417,7 @@
   $('frageJa').onclick = () => {
     $('frage').classList.remove('on');
     if (S.active) protokoll(S.active, 'abbruch');
+    KLANG.spiel('nein');
     S.active = null; save(); show('start');
   };
 
@@ -554,6 +566,17 @@
     z.push('', 'Gesurrt wird trotz ✓ nur, wenn Vibration in den Handy-Einstellungen an ist und „Nicht stören“ aus.');
     $('testOut').textContent = z.join('\n');
   };
+
+  // Ton-Schalter (Vibration bleibt immer an): auf Karte, bei „Kurz raus“ und in den Einstellungen
+  const zeigeTon = () => document.querySelectorAll('[data-ton]').forEach(b => {
+    b.textContent = S.ton ? '🔔 Ton an' : '🔕 Ton aus';
+    b.classList.toggle('aus', !S.ton);
+  });
+  document.querySelectorAll('[data-ton]').forEach(b => b.onclick = () => {
+    S.ton = KLANG.ton = !S.ton; save(); zeigeTon();
+    if (S.ton) KLANG.spiel('kopie');
+  });
+  zeigeTon();
 
   // Bildschirm anlassen: nur auf Knopfdruck, standardmäßig aus, endet beim Verlassen der Suche
   let wach = null, wachWill = false;
