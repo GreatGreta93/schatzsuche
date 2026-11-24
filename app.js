@@ -289,37 +289,56 @@
     ['historic', 'memorial', 'Denkmal', 3], ['historic', 'monument', 'Denkmal', 3], ['historic', 'wayside_cross', 'Wegkreuz', 3],
     ['historic', 'wayside_shrine', 'Bildstock', 3], ['historic', 'boundary_stone', 'Grenzstein', 3]
   ];
+  // Mehrere öffentliche Overpass-Server: ist einer überlastet, wird der nächste versucht.
+  const OVERPASS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter'
+  ];
   const sucheOrte = async (p, m) => {
-    const R = Math.round(m * 1.25);
-    const parts = ORTE.map(([k, v]) => `nwr(around:${R},${p.lat.toFixed(5)},${p.lon.toFixed(5)})["${k}"="${v}"];`).join('');
-    const q = `[out:json][timeout:25];(${parts});out center 3000;`;
-    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 28000);
-    try {
-      const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), signal: ctl.signal });
-      if (!r.ok) throw new Error('Overpass ' + r.status);
-      const els = (await r.json()).elements || [];
-      return els.map(e => {
-        const pos = e.center ? { lat: e.center.lat, lon: e.center.lon } : { lat: e.lat, lon: e.lon };
-        const o = ORTE.find(([k, v]) => e.tags && e.tags[k] === v);
-        return o && pos.lat ? { ...pos, key: e.type + e.id, art: o[2], w: o[3], name: e.tags.name || '' } : null;
-      }).filter(Boolean);
-    } finally { clearTimeout(tm); }
+    const R = Math.round(m * 1.4);
+    const parts = ORTE.map(([k, v]) => `nwr["${k}"="${v}"](around:${R},${p.lat.toFixed(5)},${p.lon.toFixed(5)});`).join('');
+    const q = `[out:json][timeout:15];(${parts});out center 3000;`;
+    let fehler = null;
+    for (const url of OVERPASS) {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const r = await fetch(url, {
+          method: 'POST', signal: ctl.signal,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: 'data=' + encodeURIComponent(q)
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        if (j.remark && /runtime error|timed out|out of memory/i.test(j.remark)) throw new Error(j.remark);
+        return (j.elements || []).map(e => {
+          const pos = e.center ? { lat: e.center.lat, lon: e.center.lon } : { lat: e.lat, lon: e.lon };
+          const o = ORTE.find(([k, v]) => e.tags && e.tags[k] === v);
+          return o && pos.lat ? { ...pos, key: e.type + e.id, art: o[2], w: o[3], name: e.tags.name || '' } : null;
+        }).filter(Boolean);
+      } catch (e) { fehler = e; console.warn('Overpass', url, e); }
+      finally { clearTimeout(tm); }
+    }
+    throw fehler || new Error('Kartendienst nicht erreichbar');
   };
   const waehleZiel = async (p, min, ausschluss = []) => {
     const m = DAUER[min].m;
-    let orte = [];
+    let orte = null;
     try { orte = await sucheOrte(p, m); } catch (e) {}
-    const passt = orte.filter(o => {
-      const d = dist(p, o);
-      return d >= m * 0.8 && d <= m * 1.2 && !S.recent.includes(o.key) && !ausschluss.includes(o.key);
-    });
-    if (passt.length) {
-      let x = Math.random() * passt.reduce((a, o) => a + o.w, 0);
-      const o = passt.find(o => (x -= o.w) < 0) || passt[0];
-      return { lat: o.lat, lon: o.lon, key: o.key, text: o.name ? `${o.art} „${o.name}“` : o.art, echt: true };
+    if (orte) {
+      const frei = orte.filter(o => !S.recent.includes(o.key) && !ausschluss.includes(o.key));
+      // erst eng um die Zielentfernung suchen, dann schrittweise großzügiger
+      for (const t of [0.2, 0.3, 0.4]) {
+        const passt = frei.filter(o => { const d = dist(p, o); return d >= m * (1 - t) && d <= m * (1 + t); });
+        if (!passt.length) continue;
+        let x = Math.random() * passt.reduce((a, o) => a + o.w, 0);
+        const o = passt.find(o => (x -= o.w) < 0) || passt[0];
+        return { lat: o.lat, lon: o.lon, key: o.key, text: o.name ? `${o.art} „${o.name}“` : o.art, echt: true };
+      }
     }
     const z = offset(p, m * (0.85 + Math.random() * 0.3), Math.random() * 360);
-    return { ...z, key: 'zufall' + Date.now(), text: 'Zufallsort (kein markanter Ort in der Nähe gefunden)', echt: false };
+    const grund = orte ? 'kein markanter Ort in passender Entfernung' : 'Kartendienst gerade nicht erreichbar';
+    return { ...z, key: 'zufall' + Date.now(), text: `Zufallsort (${grund})`, echt: false };
   };
   const startExp = async min => {
     $('wahlMsg').textContent = '🧭 Suche Standort …';
@@ -350,7 +369,7 @@
     $('reroll').textContent = rest > 0 ? `🎲 Anderes Ziel (${rest}×)` : '🎲 Keine Würfe';
     $('rerollHinweis').hidden = rest > 0;
   };
-  let map = null, zielM = null, ichM = null, accC = null, ich = null, erstFix = true, abortArmed = false;
+  let map = null, zielM = null, ichM = null, accC = null, ich = null, erstFix = true;
   const chestIcon = () => L.divIcon({ className: 'chest-ic', html: '<svg viewBox="0 0 120 100" width="46" height="40"><use href="#chest"/></svg>', iconSize: [46, 40], iconAnchor: [23, 36] });
   const openKarte = () => {
     show('karte');
@@ -363,8 +382,7 @@
     if (zielM) zielM.remove();
     zielM = L.marker([z.lat, z.lon], { icon: chestIcon() }).addTo(map);
     map.setView([z.lat, z.lon], 16);
-    erstFix = true; abortArmed = false;
-    $('abort').textContent = '✕ Abbrechen';
+    erstFix = true;
     $('ort').textContent = `🎯 ${z.text} · Expedition ${A.min} Min`;
     zeigeWuerfel(); $('kartLade').hidden = true;
     $('dist').textContent = 'Suche Standort …'; $('dist').classList.remove('nah');
@@ -404,10 +422,13 @@
       save(); openKarte();
     } catch (e) { toast(e.message); $('kartLade').hidden = true; zeigeWuerfel(); }
   };
-  $('abort').onclick = () => {
-    if (!abortArmed) { abortArmed = true; $('abort').textContent = 'Sicher?'; setTimeout(() => { abortArmed = false; $('abort').textContent = '✕ Abbrechen'; }, 3000); return; }
+  $('abort').onclick = () => $('frage').classList.add('on');
+  $('frageNein').onclick = () => $('frage').classList.remove('on');
+  $('frageJa').onclick = () => {
+    $('frage').classList.remove('on');
     S.active = null; save(); show('start');
   };
+
   $('collect').onclick = async () => {
     const A = S.active; if (!A || !ich) return;
     $('collect').disabled = true;

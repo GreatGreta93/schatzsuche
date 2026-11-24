@@ -104,6 +104,12 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
 /* Fund-Enthüllung */
 #reveal{position:fixed;inset:0;z-index:2000;background:rgba(8,10,28,.88);display:none;align-items:center;justify-content:center;padding:20px}
 #reveal.on{display:flex}
+#frage{position:fixed;inset:0;z-index:2500;background:rgba(8,10,28,.75);display:none;align-items:center;justify-content:center;padding:20px}
+#frage.on{display:flex}
+.frage-card{width:min(300px,100%)}
+.frage-card p{font-size:20px;font-weight:600;margin:0 0 16px}
+.frage-card .row button{flex:1}
+.frage-card .ghost{background:var(--panel2)}
 .chestbtn{background:none;width:190px;height:170px;animation:wackel 1.4s ease-in-out infinite}
 .chestbtn svg{width:100%;height:100%}
 @keyframes wackel{0%,100%{transform:rotate(0)}10%{transform:rotate(-6deg)}20%{transform:rotate(6deg)}30%{transform:rotate(-3deg)}40%{transform:rotate(0)}}
@@ -175,7 +181,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
       <button class="ghost" id="reroll">🎲 Anderes Ziel</button>
       <button class="ghost" id="abort">✕ Abbrechen</button>
     </div>
-    <div class="small mute" id="rerollHinweis" hidden>🎲 Alle 3 Würfe für diese Expedition sind verbraucht. Das Ziel bleibt jetzt, oder du brichst ab und startest neu.</div>
+    <div class="small mute" id="rerollHinweis" hidden>Alle 3 Würfe für diese Expedition sind verbraucht.</div>
   </div>
 </section>
 
@@ -225,6 +231,15 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
 
 <!-- Fund-Enthüllung -->
 <div id="reveal" role="dialog" aria-modal="true"></div>
+<div id="frage" role="alertdialog" aria-modal="true" aria-labelledby="frageTxt">
+  <div class="card frage-card">
+    <p id="frageTxt">Wirklich abbrechen?</p>
+    <div class="row">
+      <button class="ghost" id="frageNein">Nein</button>
+      <button class="primary warm" id="frageJa">Ja</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <svg width="0" height="0" style="position:absolute">
@@ -251,7 +266,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     document.body.insertAdjacentHTML('beforeend', '<section class="screen on"><h1>Kurz neu laden</h1><p>Die App wurde gerade aktualisiert und dein Handy hat noch Teile der alten Version gespeichert.</p><button class="primary" onclick="location.reload()">↻ Neu laden</button></section>');
   });
 </script>
-<script src="katalog.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="katalog.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
