@@ -329,7 +329,7 @@
       const p = await getPos();
       $('wahlMsg').textContent = '🗺️ Suche einen Schatzort …';
       const z = await waehleZiel(p, min);
-      S.active = { min, start: Date.now(), reroll: false, ziel: z };
+      S.active = { min, start: Date.now(), wuerfel: MAX_WUERFEL, ziel: z };
       if (z.echt) { S.recent = [z.key, ...S.recent].slice(0, 10); }
       save();
       openKarte();
@@ -341,6 +341,15 @@
   };
 
   // ---------- Karte ----------
+  const MAX_WUERFEL = 3;
+  // ältere Spielstände hatten nur reroll: true/false
+  const wuerfelRest = A => A.wuerfel ?? (A.reroll ? MAX_WUERFEL - 1 : MAX_WUERFEL);
+  const zeigeWuerfel = () => {
+    const rest = S.active ? wuerfelRest(S.active) : 0;
+    $('reroll').disabled = rest <= 0;
+    $('reroll').textContent = rest > 0 ? `🎲 Anderes Ziel (${rest}×)` : '🎲 Keine Würfe';
+    $('rerollHinweis').hidden = rest > 0;
+  };
   let map = null, zielM = null, ichM = null, accC = null, ich = null, erstFix = true, abortArmed = false;
   const chestIcon = () => L.divIcon({ className: 'chest-ic', html: '<svg viewBox="0 0 120 100" width="46" height="40"><use href="#chest"/></svg>', iconSize: [46, 40], iconAnchor: [23, 36] });
   const openKarte = () => {
@@ -357,9 +366,10 @@
     erstFix = true; abortArmed = false;
     $('abort').textContent = '✕ Abbrechen';
     $('ort').textContent = `🎯 ${z.text} · Expedition ${A.min} Min`;
-    $('reroll').disabled = A.reroll;
+    zeigeWuerfel(); $('kartLade').hidden = true;
     $('dist').textContent = 'Suche Standort …'; $('dist').classList.remove('nah');
     $('collect').disabled = true;
+    stopWatch(); // sonst läuft nach jedem Neuwürfeln eine weitere Standortverfolgung mit
     watchId = navigator.geolocation.watchPosition(
       q => updKarte({ lat: q.coords.latitude, lon: q.coords.longitude, acc: q.coords.accuracy }),
       e => { $('dist').textContent = 'Kein Standort'; $('acc').textContent = e.message; },
@@ -368,6 +378,7 @@
   const updKarte = p => {
     ich = p;
     const z = S.active && S.active.ziel; if (!z) return;
+    if (!$('kartLade').hidden) return; // während ein neues Ziel gesucht wird, nichts überschreiben
     if (!ichM) {
       ichM = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: '', html: '<div class="youdot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
       accC = L.circle([p.lat, p.lon], { radius: p.acc, color: '#2f80ff', weight: 1, fillOpacity: .08 }).addTo(map);
@@ -381,15 +392,17 @@
   };
   $('center').onclick = () => { if (ich) map.setView([ich.lat, ich.lon], 17); };
   $('reroll').onclick = async () => {
-    if (!S.active || S.active.reroll) return;
-    $('reroll').disabled = true; $('dist').textContent = 'Suche neues Ziel …';
+    if (!S.active || wuerfelRest(S.active) <= 0) return;
+    $('reroll').disabled = true; $('collect').disabled = true; $('kartLade').hidden = false;
+    $('dist').textContent = 'Suche neues Ziel …'; $('dist').classList.remove('nah');
     try {
       const p = ich || await getPos();
       const z = await waehleZiel(p, S.active.min, [S.active.ziel.key]);
-      S.active.ziel = z; S.active.reroll = true;
+      S.active.wuerfel = wuerfelRest(S.active) - 1; delete S.active.reroll;
+      S.active.ziel = z;
       if (z.echt) S.recent = [z.key, ...S.recent].slice(0, 10);
       save(); openKarte();
-    } catch (e) { toast(e.message); $('reroll').disabled = false; }
+    } catch (e) { toast(e.message); $('kartLade').hidden = true; zeigeWuerfel(); }
   };
   $('abort').onclick = () => {
     if (!abortArmed) { abortArmed = true; $('abort').textContent = 'Sicher?'; setTimeout(() => { abortArmed = false; $('abort').textContent = '✕ Abbrechen'; }, 3000); return; }
