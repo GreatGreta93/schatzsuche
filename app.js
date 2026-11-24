@@ -14,9 +14,14 @@
     60: { m: 2000, p: [0, 0, 80, 20] }
   };
   const KURZ_M = 50, MAX_ACC_KURZ = 30, NAH_M = 30, MAX_ACC_ZIEL = 50;
+  // Schatz heranholen: einmal pro Expedition, erst wenn man höchstens HERAN_MAX m entfernt ist.
+  // Danach liegt er HERAN_REST m vor einem (sicher im Einsammel-Radius).
+  const HERAN_MAX = 150, HERAN_REST = 15;
+  const RUECK_MAX_H = 4; // so lange wartet „Bin zurück“, danach gilt der Rückweg als nicht erfasst
 
   // ---------- Speicher ----------
-  let S = { homes: [], finds: [], recent: [], active: null };
+  // log: Expeditions-Protokoll; rueck: Index des Eintrags, der noch auf „Bin zurück“ wartet
+  let S = { homes: [], finds: [], recent: [], active: null, log: [], rueck: null };
   try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
   // Umzug aus Version 1: ein einzelnes Zuhause wird zum Startpunkt „Wohnung“
   if (S.home) { S.homes = [{ name: 'Wohnung', lat: S.home.lat, lon: S.home.lon }, ...S.homes]; delete S.home; }
@@ -68,6 +73,7 @@
     if (id === 'funde') renderFunde();
     if (id === 'wahl') renderWahl();
     if (id === 'set') renderSet();
+    if (id === 'protokoll') renderLog();
   };
   document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => show(b.dataset.go));
 
@@ -159,6 +165,7 @@
         <span class="code">${f.code}</span>
         <div class="row"><button class="primary" id="cpy">📋 Code kopieren</button></div>
         <p class="small mute">Den Code im Fundbüro von Greatopolis einlösen. Er bleibt unter „Meine Funde“ gespeichert.</p>
+        ${f.kind === 'exp' ? '<p class="small" style="color:var(--gold)">🏠 Zu Hause auf „Bin zurück“ tippen, dann wird die Dauer gemessen.</p>' : ''}
         <button class="ghost" id="closeR" style="width:100%">Fertig</button></div>`;
       $('cpy').onclick = () => copy(f.code);
       $('closeR').onclick = () => { R.classList.remove('on'); R.innerHTML = ''; onClose && onClose(); };
@@ -174,6 +181,7 @@
 
   // ---------- Start ----------
   const renderStart = () => {
+    renderRueck();
     const k = foundToday('kurz'), e = foundToday('exp');
     // Haken direkt im Button: Tagesfund dieser Art schon eingesammelt
     $('goKurz').classList.toggle('done', k);
@@ -298,7 +306,7 @@
     try {
       const p = await getPos();
       const z = waehleZiel(p, min);
-      S.active = { min, start: Date.now(), wuerfel: MAX_WUERFEL, ziel: z };
+      S.active = { min, start: Date.now(), wuerfel: MAX_WUERFEL, ziel: z, luft: Math.round(dist(p, z)) };
       save();
       openKarte();
     } catch (e) {
@@ -356,6 +364,29 @@
     $('dist').classList.toggle('nah', nah);
     $('acc').textContent = `Luftlinie · GPS ± ${Math.round(p.acc)} m`;
     $('collect').disabled = !nah;
+    zeigeHeran(d);
+  };
+  // Heranholen: nur in der Nähe, nur einmal pro Expedition
+  const zeigeHeran = d => {
+    const A = S.active, b = $('heran');
+    if (!A || A.heran) { b.hidden = true; return; }
+    b.hidden = d <= NAH_M;
+    b.disabled = d > HERAN_MAX;
+    b.textContent = d > HERAN_MAX ? `🧲 Heranholen ab ${HERAN_MAX} m Nähe` : '🧲 Schatz heranholen (1×)';
+  };
+  $('heran').onclick = () => {
+    const A = S.active; if (!A || A.heran || !ich) return;
+    const z = A.ziel, d = dist(ich, z);
+    if (d > HERAN_MAX || d <= NAH_M) return;
+    // auf der Linie zwischen mir und dem Schatz bis auf HERAN_REST m heranziehen
+    const f = HERAN_REST / d;
+    A.ziel = { ...z, lat: ich.lat + (z.lat - ich.lat) * f, lon: ich.lon + (z.lon - ich.lon) * f };
+    A.heran = true; save();
+    zielM.setLatLng([A.ziel.lat, A.ziel.lon]);
+    map.setView([A.ziel.lat, A.ziel.lon], 18);
+    if (navigator.vibrate) navigator.vibrate(60);
+    toast('🧲 Der Schatz ist zu dir gerollt!');
+    updKarte(ich);
   };
   $('center').onclick = () => { if (ich) map.setView([ich.lat, ich.lon], 17); };
   $('reroll').onclick = async () => {
@@ -374,20 +405,79 @@
   $('frageNein').onclick = () => $('frage').classList.remove('on');
   $('frageJa').onclick = () => {
     $('frage').classList.remove('on');
+    if (S.active) protokoll(S.active, 'abbruch');
     S.active = null; save(); show('start');
   };
+
+  // ---------- Expeditions-Protokoll ----------
+  // Ein Eintrag pro Expedition: Start, Ziel erreicht, zurück. Daraus Hinweg- und Gesamtdauer.
+  const protokoll = (A, ende) => {
+    const e = {
+      start: A.start, min: A.min, luft: A.luft ?? null,
+      wuerfel: MAX_WUERFEL - wuerfelRest(A), heran: !!A.heran,
+      ende, ziel: ende === 'abbruch' ? null : Date.now(), abbruch: ende === 'abbruch' ? Date.now() : null, zurueck: null
+    };
+    S.log.push(e);
+    S.rueck = ende === 'abbruch' ? null : S.log.length - 1;
+    save();
+  };
+  const rueckOffen = () => {
+    const e = S.rueck !== null && S.log[S.rueck];
+    if (!e) return null;
+    if (Date.now() - e.ziel > RUECK_MAX_H * 3600e3) { S.rueck = null; save(); return null; }
+    return e;
+  };
+  const renderRueck = () => {
+    const e = rueckOffen();
+    $('rueck').hidden = !e;
+    if (e) $('rueckTxt').textContent = `Expedition ${e.min} Min · Ziel erreicht um ${uhr(e.ziel)}. Tippe, sobald du wieder da bist – dann sehen wir, ob die Dauer passt.`;
+  };
+  $('rueckJa').onclick = () => {
+    const e = rueckOffen(); if (!e) return renderRueck();
+    e.zurueck = Date.now(); S.rueck = null; save();
+    const g = Math.round((e.zurueck - e.start) / 60000);
+    toast(`Willkommen zurück! ${g} Min statt geplanter ${e.min} Min`);
+    renderRueck();
+  };
+  $('rueckNein').onclick = () => { S.rueck = null; save(); renderRueck(); };
+
+  const uhr = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const minTxt = (a, b) => (a && b) ? Math.round((b - a) / 60000) + ' Min' : '–';
+  const ENDE = { fund: 'Fund', gelaufen: 'ohne Fund', abbruch: 'abgebrochen' };
+  const renderLog = () => {
+    if (!S.log.length) { $('logList').innerHTML = '<p class="mute small">Noch keine Expedition protokolliert.</p>'; $('logCopy').hidden = true; return; }
+    $('logCopy').hidden = false;
+    $('logList').innerHTML = [...S.log].reverse().map(e => {
+      const d = new Date(e.start);
+      const ges = e.zurueck ? Math.round((e.zurueck - e.start) / 60000) : null;
+      const abw = ges !== null ? ges - e.min : null;
+      const abwTxt = abw === null ? '' : ` <span class="abw ${Math.abs(abw) <= e.min * 0.25 ? 'ok' : 'weg'}">${abw > 0 ? '+' : ''}${abw}</span>`;
+      return `<div class="log"><b>${d.toLocaleDateString('de-DE')} · ${uhr(e.start)} · ${e.min} Min geplant</b>
+        <div class="small mute">Ziel ${e.luft ? fmtM(e.luft) + ' Luftlinie' : '–'} · ${ENDE[e.ende]}${e.wuerfel ? ` · ${e.wuerfel}× gewürfelt` : ''}${e.heran ? ' · 🧲 herangeholt' : ''}</div>
+        <div class="small">${e.ende === 'abbruch'
+          ? `Abgebrochen nach ${minTxt(e.start, e.abbruch)}`
+          : `Hinweg ${minTxt(e.start, e.ziel)} · Gesamt ${ges !== null ? ges + ' Min' : (S.log[S.rueck] === e ? 'läuft noch …' : 'Rückweg nicht erfasst')}${abwTxt}`}</div></div>`;
+    }).join('');
+  };
+  // Als Text kopieren, um es direkt im Chat als Feedback einzufügen
+  $('logCopy').onclick = () => copy(['Datum;Start;geplant Min;Luftlinie m;Ende;Hinweg Min;Gesamt Min;gewürfelt;herangeholt',
+    ...S.log.map(e => [new Date(e.start).toLocaleDateString('de-DE'), uhr(e.start), e.min, e.luft ?? '', ENDE[e.ende],
+      e.ziel ? Math.round((e.ziel - e.start) / 60000) : '', e.zurueck ? Math.round((e.zurueck - e.start) / 60000) : '',
+      e.wuerfel, e.heran ? 'ja' : 'nein'].join(';'))].join('\n'));
 
   $('collect').onclick = async () => {
     const A = S.active; if (!A || !ich) return;
     $('collect').disabled = true;
     stopWatch();
     if (foundToday('exp')) {
+      protokoll(A, 'gelaufen');
       S.active = null; save();
-      return nurGelaufen('Den Expeditions-Fund für heute hattest du schon, aber jeder Meter zählt. Morgen gibt es wieder etwas!', () => show('start'));
+      return nurGelaufen('Den Expeditions-Fund für heute hattest du schon, aber jeder Meter zählt. Morgen gibt es wieder etwas!<br><br>🏠 Tippe zu Hause auf „Bin zurück“, damit die Dauer gemessen wird.', () => show('start'));
     }
     let pool = 'normal';
     try { pool = (await wetterFrisch(ich)).pool; } catch (e) {}
     const f = addFind('exp', pool, rollR(DAUER[A.min].p), { min: A.min, ort: A.ziel.text });
+    protokoll(A, 'fund');
     S.active = null; save();
     reveal(f, () => show('start'));
   };
@@ -415,9 +505,10 @@
     }).join('');
     $('list').querySelectorAll('.copy').forEach(b => b.onclick = () => copy(S.finds[+b.dataset.i].code));
   };
+  $('goLog').onclick = () => show('protokoll');
 
   // ---------- Sichern / Wiederherstellen ----------
-  $('backup').onclick = () => copy(JSON.stringify({ app: 'schatzsuche', v: 1, finds: S.finds, recent: S.recent }));
+  $('backup').onclick = () => copy(JSON.stringify({ app: 'schatzsuche', v: 2, finds: S.finds, recent: S.recent, log: S.log }));
   $('restore').onclick = () => {
     try {
       const o = JSON.parse($('restoreTxt').value);
@@ -425,6 +516,11 @@
       const have = new Set(S.finds.map(f => f.code));
       const neu = o.finds.filter(f => f && f.code && !have.has(f.code));
       S.finds = [...S.finds, ...neu].sort((a, b) => a.t - b.t);
+      if (Array.isArray(o.log)) {
+        const da = new Set(S.log.map(e => e.start));
+        S.log = [...S.log, ...o.log.filter(e => e && e.start && !da.has(e.start))].sort((a, b) => a.start - b.start);
+        S.rueck = null;
+      }
       save(); $('restoreTxt').value = '';
       toast(`${neu.length} Funde wiederhergestellt`);
     } catch (e) { toast('Das sieht nicht nach einer Sicherung aus.'); }

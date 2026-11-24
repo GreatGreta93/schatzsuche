@@ -83,6 +83,19 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 #testOut{white-space:pre-wrap;background:#0f1530;border-radius:12px;padding:10px;margin-top:8px;font:14px ui-monospace,monospace}
 #testOut:empty{display:none}
 #kartLade{margin-top:8px}
+.heran{width:100%;margin-top:10px;border-color:var(--violet);background:rgba(140,108,255,.16)}
+.heran[hidden]{display:none}
+
+/* Bin zurück */
+.rueck{background:rgba(255,207,92,.12);border:2px solid var(--gold);border-radius:20px;padding:14px;margin-bottom:12px}
+.rueck[hidden]{display:none}
+.rueck p{margin:4px 0 10px}
+
+/* Protokoll */
+.log{background:var(--panel);border-radius:16px;padding:12px;margin-bottom:10px;border-left:5px solid var(--gelb)}
+.log b{display:block;margin-bottom:2px}
+.abw{display:inline-block;border-radius:8px;padding:0 7px;font-weight:600;color:var(--dunkel)}
+.abw.ok{background:var(--gruen)}.abw.weg{background:var(--rot)}
 .youdot{width:18px;height:18px;border-radius:50%;background:#2f80ff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(47,128,255,.25)}
 .chest-ic{filter:drop-shadow(0 3px 3px rgba(0,0,0,.35))}
 
@@ -165,6 +178,14 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     <p class="hint" id="wxHint"></p>
     <svg viewBox="0 0 120 100" aria-hidden="true"><use href="#chest"/></svg>
   </div>
+  <div class="rueck" id="rueck" hidden>
+    <b>🏠 Wieder zurück?</b>
+    <p class="small" id="rueckTxt"></p>
+    <div class="row">
+      <button class="primary" id="rueckJa">Bin zurück</button>
+      <button class="ghost" id="rueckNein">Nicht erfassen</button>
+    </div>
+  </div>
   <button class="big kurz" id="goKurz"><div class="ic">🚪</div><div><b>Kurz raus</b><span>Einmal am Tag ein Fund vor der Haustür · ab 50 m vom Startpunkt</span></div></button>
   <button class="big exp" id="goExp"><div class="ic">🗺️</div><div><b>Expedition</b><span>Ziel auf der Karte · je länger, desto seltener</span></div></button>
   <div class="row">
@@ -192,6 +213,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     <div class="small mute" id="acc"></div>
     <div class="lade" id="kartLade" hidden><i></i></div>
     <button class="primary" id="collect" style="width:100%;margin-top:10px" disabled>🎁 Einsammeln</button>
+    <button class="ghost heran" id="heran" hidden>🧲 Schatz heranholen (1×)</button>
     <div class="row">
       <button class="ghost" id="center">📍 Zentrieren</button>
       <button class="ghost" id="reroll">🎲 Anderes Ziel</button>
@@ -219,7 +241,17 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
   <button class="back" data-go="start">← Zurück</button>
   <h1>Meine Funde</h1>
   <div class="stats" id="stats"></div>
+  <button class="ghost" id="goLog" style="width:100%;margin-bottom:14px">⏱️ Expeditions-Protokoll</button>
   <div id="list"></div>
+</section>
+
+<!-- Expeditions-Protokoll -->
+<section class="screen" id="protokoll">
+  <button class="back" data-go="funde">← Zurück</button>
+  <h1>Protokoll</h1>
+  <p class="small mute">Jede Expedition mit Start, Ankunft am Ziel und Rückkehr. Die Zahl im Kästchen zeigt, wie viele Minuten du über (+) oder unter (−) der geplanten Dauer lagst.</p>
+  <button class="ghost" id="logCopy" style="width:100%;margin-bottom:12px">📋 Als Text kopieren (für Feedback)</button>
+  <div id="logList"></div>
 </section>
 
 <!-- Einstellungen -->
@@ -290,7 +322,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     document.body.insertAdjacentHTML('beforeend', '<section class="screen on"><h1>Kurz neu laden</h1><p>Die App wurde gerade aktualisiert und dein Handy hat noch Teile der alten Version gespeichert.</p><button class="primary" onclick="location.reload()">↻ Neu laden</button></section>');
   });
 </script>
-<script src="katalog.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="katalog.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
