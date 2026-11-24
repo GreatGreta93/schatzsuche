@@ -3,15 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#141c3a">
+<meta name="theme-color" content="#141838">
 <title>Schatzsuche</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
-  --bg:#141c3a;--panel:#1f2a55;--panel2:#273469;--ink:#f4f1ff;--mute:#a9b1d6;
-  --tq:#2ec4b6;--pink:#ff6fa5;--orange:#ff9f43;--violet:#8c6cff;
+  /* Grundfarben und Update-Farben aus Greatopolis (schlecht · eher schlecht · okay · gut) */
+  --bg:#141838;--panel:#1d2450;--panel2:#273064;--line:#34437f;--ink:#eaf2ff;--mute:#a3add6;--dunkel:#1b1e3a;
+  --rot:#e0679a;--gelb:#f2b134;--gruen:#a7d98c;--tq:#1fd1c4;--gold:#ffcf5c;
+  --pink:var(--rot);--orange:var(--gelb);--violet:#8c6cff;
   --r0:#b8c0cc;--r1:#4fa3ff;--r2:#b072ff;--r3:#ffc23d;
 }
 *{box-sizing:border-box;min-width:0}
@@ -22,34 +24,43 @@ body{background:var(--bg);color:var(--ink);font:16px/1.45 Fredoka,system-ui,sans
 button{font:inherit;color:inherit;border:0;cursor:pointer}
 .screen{display:none;min-height:100%;padding:18px 16px 32px;max-width:560px;margin:0 auto}
 .screen.on{display:block}
-h1{font-size:30px;line-height:1.05;margin:6px 0 4px;font-weight:700}
+h1{font-size:30px;line-height:1.05;margin:6px 0 4px;font-weight:700;color:var(--gold)}
 h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .mute{color:var(--mute)}
 .small{font-size:14px}
 
 /* Start */
-.hero{position:relative;border-radius:22px;background:linear-gradient(160deg,#2b3a7a,#1b2450 60%,#3a2357);padding:18px;overflow:hidden;margin:10px 0 14px}
+.hero{position:relative;border-radius:22px;background:linear-gradient(160deg,#25336f,#1b2150 55%,#3b2350);border:1px solid var(--line);padding:18px;overflow:hidden;margin:10px 0 14px}
 .hero svg{position:absolute;right:-10px;bottom:-14px;width:150px;opacity:.95}
 .wx{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:999px;padding:6px 12px;font-size:15px;margin-top:8px}
 .hint{margin:10px 0 0;max-width:62%;font-size:15px}
-.big{position:relative;display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:20px;padding:16px;margin-bottom:12px;background:var(--panel)}
+.big{position:relative;display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:20px;padding:16px;margin-bottom:12px;background:var(--panel);border:2px solid var(--line)}
+.big b{padding-right:70px}
 .big .ic{font-size:34px;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .big b{display:block;font-size:19px;font-weight:600}
 .big span{color:var(--mute);font-size:14px}
-.big.kurz .ic{background:rgba(46,196,182,.22)}
-.big.exp .ic{background:rgba(255,159,67,.22)}
-.big.done::after{content:'✓ heute';position:absolute;top:10px;right:12px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;background:rgba(46,196,182,.2);color:#7ff0e4}
+.big.kurz{border-color:rgba(31,209,196,.55);background:linear-gradient(120deg,rgba(31,209,196,.16),var(--panel) 65%)}
+.big.exp{border-color:rgba(242,177,52,.55);background:linear-gradient(120deg,rgba(242,177,52,.16),var(--panel) 65%)}
+.big.kurz .ic{background:var(--tq)}
+.big.exp .ic{background:var(--gelb)}
+/* Tagesfund: Kästchen „heute“ immer da, nach dem Einsammeln mit grünem Haken */
+.big::after{content:'heute';position:absolute;top:10px;right:12px;border-radius:8px;padding:2px 9px;font-size:12px;font-weight:600;border:1.5px solid var(--line);color:var(--mute)}
+.big.done::after{content:'✓ heute';background:var(--gruen);border-color:var(--gruen);color:var(--dunkel)}
 .row{display:flex;gap:10px}
 .row>button{flex:1}
-.ghost{background:var(--panel);border-radius:14px;padding:12px;min-height:48px}
-.primary{background:var(--tq);color:#0b1a2a;font-weight:600;border-radius:14px;padding:12px 16px;min-height:50px}
-.primary:disabled{background:#3b4675;color:#8c95c0}
-.warm{background:var(--orange);color:#2a1300}
+.ghost{background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:12px;min-height:48px}
+.primary{background:var(--tq);color:var(--dunkel);font-weight:600;border-radius:14px;padding:12px 16px;min-height:50px}
+.primary:disabled{background:var(--line);color:#8c95c0}
+.warm{background:var(--gelb);color:var(--dunkel)}
+.tint-gruen{border-color:rgba(167,217,140,.55);background:rgba(167,217,140,.12)}
+.tint-rot{border-color:rgba(224,103,154,.55);background:rgba(224,103,154,.12)}
 .back{background:none;color:var(--mute);padding:8px 0;min-height:44px}
 
 /* Expedition wählen */
 .durs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0}
-.dur{background:var(--panel);border-radius:18px;padding:14px;text-align:left;min-height:96px}
+.dur{--c:var(--tq);background:linear-gradient(150deg,color-mix(in srgb,var(--c) 22%,transparent),var(--panel) 70%);border:2px solid color-mix(in srgb,var(--c) 60%,transparent);border-radius:18px;padding:14px;text-align:left;min-height:96px}
+.dur b{color:var(--c)}
+.dur:nth-child(1){--c:var(--gruen)}.dur:nth-child(2){--c:var(--tq)}.dur:nth-child(3){--c:var(--gelb)}.dur:nth-child(4){--c:var(--rot)}.dur:nth-child(5){--c:var(--gold)}
 .dur b{font-size:24px;display:block}
 .dur span{font-size:13px;color:var(--mute);display:block}
 .dur .odds{margin-top:6px;display:flex;gap:4px}
@@ -61,7 +72,7 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .sheet{background:var(--bg);border-radius:20px 20px 0 0;margin-top:-18px;position:relative;z-index:500;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
 .ort{font-size:15px;color:var(--mute)}
 .dist{font-size:34px;font-weight:700;line-height:1.1;margin:4px 0}
-.dist.nah{color:var(--r3)}
+.dist.nah{color:var(--gruen)}
 .sheet .row{margin-top:10px}
 .ghost:disabled{opacity:.35;filter:grayscale(1);cursor:not-allowed}
 #rerollHinweis{margin-top:8px}
@@ -71,12 +82,12 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 
 /* Kurz raus */
 .meter{height:14px;border-radius:999px;background:var(--panel);overflow:hidden;margin:14px 0 8px}
-.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--tq),#7ff0e4);transition:width .4s}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--tq),var(--gruen));transition:width .4s}
 
 /* Ladebalken (unbestimmt) */
 .lade{height:8px;border-radius:999px;background:var(--panel);overflow:hidden;position:relative;margin-top:4px}
 .lade[hidden]{display:none}
-.lade i{position:absolute;top:0;bottom:0;width:40%;border-radius:999px;background:linear-gradient(90deg,var(--tq),var(--violet));animation:lade 1.3s ease-in-out infinite}
+.lade i{position:absolute;top:0;bottom:0;width:40%;border-radius:999px;background:linear-gradient(90deg,var(--tq),var(--gelb));animation:lade 1.3s ease-in-out infinite}
 @keyframes lade{0%{left:-40%}100%{left:100%}}
 
 /* Funde */
@@ -88,11 +99,13 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .code{font-family:ui-monospace,Menlo,monospace;font-size:14px;letter-spacing:.5px}
 .copy{background:var(--panel2);border-radius:12px;padding:8px 10px;min-height:44px;font-size:14px;flex:none}
 .stats{display:flex;gap:10px;margin:8px 0 14px}
-.stat{flex:1;background:var(--panel);border-radius:16px;padding:12px}
+.stat{flex:1;background:var(--panel);border-radius:16px;padding:12px;border-top:4px solid var(--tq)}
+.stat+.stat{border-top-color:var(--gelb)}
 .stat b{font-size:24px;display:block}
 
 /* Einstellungen */
-.box{background:var(--panel);border-radius:18px;padding:14px;margin-bottom:12px}
+.box{background:var(--panel);border-radius:18px;padding:14px;margin-bottom:12px;border-left:5px solid var(--tq)}
+.box:nth-of-type(2){border-left-color:var(--gelb)}.box:nth-of-type(3){border-left-color:var(--gruen)}
 .box p{margin:4px 0 10px}
 .box .ghost{background:var(--panel2)}
 input{width:100%;min-height:48px;border-radius:12px;border:0;padding:10px 12px;font:16px Fredoka,system-ui,sans-serif;background:#0f1530;color:var(--ink);margin-top:6px}
@@ -149,8 +162,8 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
   <button class="big kurz" id="goKurz"><div class="ic">🚪</div><div><b>Kurz raus</b><span>Einmal am Tag ein Fund vor der Haustür · ab 50 m vom Startpunkt</span></div></button>
   <button class="big exp" id="goExp"><div class="ic">🗺️</div><div><b>Expedition</b><span>Ziel auf der Karte · je länger, desto seltener</span></div></button>
   <div class="row">
-    <button class="ghost" id="goFunde">📜 Meine Funde</button>
-    <button class="ghost" id="goSet">⚙️ Einstellungen</button>
+    <button class="ghost tint-gruen" id="goFunde">📜 Meine Funde</button>
+    <button class="ghost tint-rot" id="goSet">⚙️ Einstellungen</button>
   </div>
 </section>
 

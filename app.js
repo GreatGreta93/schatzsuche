@@ -130,7 +130,7 @@
       const k = document.createElement('i');
       k.className = 'konf';
       k.style.left = '50%'; k.style.top = '45%';
-      k.style.background = [col, '#ff6fa5', '#2ec4b6', '#ff9f43', '#fff'][i % 5];
+      k.style.background = [col, '#e0679a', '#1fd1c4', '#f2b134', '#a7d98c'][i % 5];
       const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 220;
       k.style.setProperty('--dx', Math.cos(a) * d + 'px');
       k.style.setProperty('--dy', Math.sin(a) * d + 160 + 'px');
@@ -167,7 +167,7 @@
     const R = $('reveal');
     R.innerHTML = `<div class="card"><div class="big-ic">🥾</div><h2>Ziel erreicht!</h2><p>${txt}</p>
       <button class="ghost" id="closeR" style="width:100%">Fertig</button></div>`;
-    R.classList.add('on'); konfetti('#2ec4b6');
+    R.classList.add('on'); konfetti('#1fd1c4');
     $('closeR').onclick = () => { R.classList.remove('on'); R.innerHTML = ''; onClose && onClose(); };
   };
 
