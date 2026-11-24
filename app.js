@@ -279,6 +279,7 @@
       <div class="odds">${d.p.map((p, i) => p ? `<i class="dot" style="background:${RCOL[i]};opacity:${0.35 + p / 100}" title="${SELTENHEIT[i]} ${p} %"></i>` : '').join('')}</div></button>`).join('');
     $('durs').querySelectorAll('.dur').forEach(b => b.onclick = () => startExp(+b.dataset.min));
     $('wahlMsg').textContent = '';
+    $('wahlLade').hidden = true;
   };
 
   // ---------- Zielsuche (OpenStreetMap / Overpass) ----------
@@ -322,10 +323,11 @@
   };
   const startExp = async min => {
     $('wahlMsg').textContent = '🧭 Suche Standort …';
+    $('wahlLade').hidden = false;
     $('durs').querySelectorAll('button').forEach(b => b.disabled = true);
     try {
       const p = await getPos();
-      $('wahlMsg').textContent = '🗺️ Suche einen Schatzort … (kann ein paar Sekunden dauern)';
+      $('wahlMsg').textContent = '🗺️ Suche einen Schatzort …';
       const z = await waehleZiel(p, min);
       S.active = { min, start: Date.now(), reroll: false, ziel: z };
       if (z.echt) { S.recent = [z.key, ...S.recent].slice(0, 10); }
@@ -333,6 +335,7 @@
       openKarte();
     } catch (e) {
       $('wahlMsg').textContent = e.message;
+      $('wahlLade').hidden = true;
       $('durs').querySelectorAll('button').forEach(b => b.disabled = false);
     }
   };

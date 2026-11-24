@@ -72,6 +72,12 @@ h2{font-size:22px;margin:0 0 10px;font-weight:600}
 .meter{height:14px;border-radius:999px;background:var(--panel);overflow:hidden;margin:14px 0 8px}
 .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--tq),#7ff0e4);transition:width .4s}
 
+/* Ladebalken (unbestimmt) */
+.lade{height:8px;border-radius:999px;background:var(--panel);overflow:hidden;position:relative;margin-top:4px}
+.lade[hidden]{display:none}
+.lade i{position:absolute;top:0;bottom:0;width:40%;border-radius:999px;background:linear-gradient(90deg,var(--tq),var(--violet));animation:lade 1.3s ease-in-out infinite}
+@keyframes lade{0%{left:-40%}100%{left:100%}}
+
 /* Funde */
 .find{display:flex;gap:12px;align-items:center;background:var(--panel);border-radius:16px;padding:12px;margin-bottom:10px}
 .find .ic{font-size:30px;width:48px;height:48px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--panel2)}
@@ -149,6 +155,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
   <p class="mute" id="wahlInfo">Hin und zurück, ungefähr.</p>
   <div class="durs" id="durs"></div>
   <p class="small mute" id="wahlMsg"></p>
+  <div class="lade" id="wahlLade" hidden><i></i></div>
 </section>
 
 <!-- Karte -->
@@ -239,7 +246,7 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:0;padding:10px;fo
     document.body.insertAdjacentHTML('beforeend', '<section class="screen on"><h1>Kurz neu laden</h1><p>Die App wurde gerade aktualisiert und dein Handy hat noch Teile der alten Version gespeichert.</p><button class="primary" onclick="location.reload()">↻ Neu laden</button></section>');
   });
 </script>
-<script src="katalog.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="katalog.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
