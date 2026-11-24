@@ -282,63 +282,12 @@
     $('wahlLade').hidden = true;
   };
 
-  // ---------- Zielsuche (OpenStreetMap / Overpass) ----------
-  const ORTE = [
-    ['amenity', 'bench', 'Bank', 1], ['amenity', 'fountain', 'Brunnen', 3], ['amenity', 'drinking_water', 'Trinkbrunnen', 3],
-    ['leisure', 'playground', 'Spielplatz', 2], ['tourism', 'viewpoint', 'Aussichtspunkt', 4], ['tourism', 'artwork', 'Kunstwerk', 3],
-    ['historic', 'memorial', 'Denkmal', 3], ['historic', 'monument', 'Denkmal', 3], ['historic', 'wayside_cross', 'Wegkreuz', 3],
-    ['historic', 'wayside_shrine', 'Bildstock', 3], ['historic', 'boundary_stone', 'Grenzstein', 3]
-  ];
-  // Mehrere öffentliche Overpass-Server: ist einer überlastet, wird der nächste versucht.
-  const OVERPASS = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter'
-  ];
-  const sucheOrte = async (p, m) => {
-    const R = Math.round(m * 1.4);
-    const parts = ORTE.map(([k, v]) => `nwr["${k}"="${v}"](around:${R},${p.lat.toFixed(5)},${p.lon.toFixed(5)});`).join('');
-    const q = `[out:json][timeout:15];(${parts});out center 3000;`;
-    let fehler = null;
-    for (const url of OVERPASS) {
-      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 15000);
-      try {
-        const r = await fetch(url, {
-          method: 'POST', signal: ctl.signal,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-          body: 'data=' + encodeURIComponent(q)
-        });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const j = await r.json();
-        if (j.remark && /runtime error|timed out|out of memory/i.test(j.remark)) throw new Error(j.remark);
-        return (j.elements || []).map(e => {
-          const pos = e.center ? { lat: e.center.lat, lon: e.center.lon } : { lat: e.lat, lon: e.lon };
-          const o = ORTE.find(([k, v]) => e.tags && e.tags[k] === v);
-          return o && pos.lat ? { ...pos, key: e.type + e.id, art: o[2], w: o[3], name: e.tags.name || '' } : null;
-        }).filter(Boolean);
-      } catch (e) { fehler = e; console.warn('Overpass', url, e); }
-      finally { clearTimeout(tm); }
-    }
-    throw fehler || new Error('Kartendienst nicht erreichbar');
-  };
-  const waehleZiel = async (p, min, ausschluss = []) => {
+  // ---------- Zielsuche ----------
+  // Vorerst nur ein Punkt in passender Entfernung; die Suche nach markanten Orten ist pausiert.
+  const waehleZiel = (p, min) => {
     const m = DAUER[min].m;
-    let orte = null;
-    try { orte = await sucheOrte(p, m); } catch (e) {}
-    if (orte) {
-      const frei = orte.filter(o => !S.recent.includes(o.key) && !ausschluss.includes(o.key));
-      // erst eng um die Zielentfernung suchen, dann schrittweise großzügiger
-      for (const t of [0.2, 0.3, 0.4]) {
-        const passt = frei.filter(o => { const d = dist(p, o); return d >= m * (1 - t) && d <= m * (1 + t); });
-        if (!passt.length) continue;
-        let x = Math.random() * passt.reduce((a, o) => a + o.w, 0);
-        const o = passt.find(o => (x -= o.w) < 0) || passt[0];
-        return { lat: o.lat, lon: o.lon, key: o.key, text: o.name ? `${o.art} „${o.name}“` : o.art, echt: true };
-      }
-    }
     const z = offset(p, m * (0.85 + Math.random() * 0.3), Math.random() * 360);
-    const grund = orte ? 'kein markanter Ort in passender Entfernung' : 'Kartendienst gerade nicht erreichbar';
-    return { ...z, key: 'zufall' + Date.now(), text: `Zufallsort (${grund})`, echt: false };
+    return { ...z, key: 'ziel' + Date.now(), text: 'Schatz' };
   };
   const startExp = async min => {
     $('wahlMsg').textContent = '🧭 Suche Standort …';
@@ -346,10 +295,8 @@
     $('durs').querySelectorAll('button').forEach(b => b.disabled = true);
     try {
       const p = await getPos();
-      $('wahlMsg').textContent = '🗺️ Suche einen Schatzort …';
-      const z = await waehleZiel(p, min);
+      const z = waehleZiel(p, min);
       S.active = { min, start: Date.now(), wuerfel: MAX_WUERFEL, ziel: z };
-      if (z.echt) { S.recent = [z.key, ...S.recent].slice(0, 10); }
       save();
       openKarte();
     } catch (e) {
@@ -383,7 +330,7 @@
     zielM = L.marker([z.lat, z.lon], { icon: chestIcon() }).addTo(map);
     map.setView([z.lat, z.lon], 16);
     erstFix = true;
-    $('ort').textContent = `🎯 ${z.text} · Expedition ${A.min} Min`;
+    $('ort').textContent = `🎯 Expedition ${A.min} Min · folge der Truhe auf der Karte`;
     zeigeWuerfel(); $('kartLade').hidden = true;
     $('dist').textContent = 'Suche Standort …'; $('dist').classList.remove('nah');
     $('collect').disabled = true;
@@ -415,10 +362,9 @@
     $('dist').textContent = 'Suche neues Ziel …'; $('dist').classList.remove('nah');
     try {
       const p = ich || await getPos();
-      const z = await waehleZiel(p, S.active.min, [S.active.ziel.key]);
+      const z = waehleZiel(p, S.active.min);
       S.active.wuerfel = wuerfelRest(S.active) - 1; delete S.active.reroll;
       S.active.ziel = z;
-      if (z.echt) S.recent = [z.key, ...S.recent].slice(0, 10);
       save(); openKarte();
     } catch (e) { toast(e.message); $('kartLade').hidden = true; zeigeWuerfel(); }
   };

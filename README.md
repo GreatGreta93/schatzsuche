@@ -7,4 +7,4 @@ Kleine Web-App, die zum Rausgehen motiviert: Ziel auf der Karte ansteuern, Funds
 - `katalog.js` – Fundstück-Katalog (Schnittstelle zu Greatopolis, Nummern nie neu vergeben)
 - `technik-test.html` – Technik-Test vom 20.11.2026
 
-Karte © OpenStreetMap-Mitwirkende · Ziele: Overpass API · Wetter: Open-Meteo
+Karte © OpenStreetMap-Mitwirkende · Wetter: Open-Meteo
