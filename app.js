@@ -3,7 +3,7 @@
   const $ = id => document.getElementById(id);
   const KEY = 'schatzsuche';
   const RCOL = ['var(--r0)', 'var(--r1)', 'var(--r2)', 'var(--r3)'];
-  const RHEX = ['#b8c0cc', '#4fa3ff', '#b072ff', '#ffc23d'];
+  const RHEX = ['#b8c0cc', '#4fa3ff', '#b072ff', '#ff8a2b'];
 
   // Dauer → Luftlinie (m) und Seltenheits-Chancen [gewöhnlich, selten, episch, legendär]
   const DAUER = {
